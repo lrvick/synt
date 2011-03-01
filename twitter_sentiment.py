@@ -3,6 +3,8 @@ import urllib2, json, base64, sys, termios, tty, os
 USER = "your_twitter_user"
 PASS = "your_twitter_pass"
 
+queries = ['awesome','beautiful','shit','fuck','android','iphone','blackberry','windows','linux','apple','google']
+
 negative_file = open("negative.txt","w")
 positive_file = open("postive.txt","w")
 
