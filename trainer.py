@@ -8,11 +8,6 @@ pos_filename = "positive.txt"
 
 queries = ['awesome','beautiful','shit','fuck','android','iphone','blackberry','windows','linux','apple','google']
 
-if "your_twitter" in USER+PASS:
-    print "You didn't set your twitter username and password in the script!"
-    USER = raw_input("Username>")
-    PASS = raw_input("Password>")
-
 keyReader = None
 try:
 	import termios, tty
@@ -38,6 +33,18 @@ if not keyReader:
 	keyReader="python"
 	read_key=lambda :raw_input()[0]
 
+def clear_screen():
+    if keyReader == "unix":
+        os.system("clear")
+    if keyReader == "win":
+        os.system("cls")
+
+if "your_twitter" in USER+PASS:
+    print "You didn't set your twitter username and password in the script!"
+    USER = raw_input("Username>")
+    PASS = raw_input("Password>")
+    clear_screen()
+
 pos_file = open(pos_filename,"w")
 try:
     for line in pos_file:
@@ -59,10 +66,7 @@ stream = urllib2.urlopen(httprequest)
 for item in stream:
     data = json.loads(item)
     if data.get('user',None):
-        if keyReader == "unix":
-            os.system("clear")
-        if keyReader == "win":
-            os.system("cls")
+        clear_screen()
         tweet_text = data['text'].encode('utf8')
         print('Synt sentiment trainer | Totals: Postive (%s) Negative (%s)' % (pos_count,neg_count))
         print('\n')
@@ -85,6 +89,6 @@ for item in stream:
             print("Comment Ignored as: Neutral")
         if key == '3':
             neg_file.write("%s \n" % tweet_text)
-            neg_write += 1 
+            neg_count += 1 
             print('\n')
             print("Comment saved as: Negative")
