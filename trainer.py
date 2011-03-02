@@ -45,13 +45,13 @@ if "your_twitter" in USER+PASS:
     PASS = raw_input("Password>")
     clear_screen()
 
-pos_file = open(pos_filename,"w")
+pos_file = open(pos_filename,"a")
 try:
     for line in pos_file:
         pos_count += 1 
 except IOError:
     pos_count = 0
-neg_file = open(neg_filename,"w")
+neg_file = open(neg_filename,"a")
 try:
     for line in neg_file:
         neg_count += 1
