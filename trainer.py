@@ -1,12 +1,17 @@
+import urllib2, json, base64, sys, os 
+
 USER = "your_twitter_user"
 PASS = "your_twitter_pass"
+
+neg_filename = "negative.txt"
+pos_filename = "positive.txt"
+
+queries = ['awesome','beautiful','shit','fuck','android','iphone','blackberry','windows','linux','apple','google']
 
 if "your_twitter" in USER+PASS:
     print "You didn't set your twitter username and password in the script!"
     USER = raw_input("Username>")
     PASS = raw_input("Password>")
-
-import urllib2, json, base64, sys, os 
 
 keyReader = None
 try:
@@ -32,15 +37,21 @@ if not keyReader:
 	print "Could not find a good key reader, you will have to push enter after typing a key :("
 	keyReader="python"
 	read_key=lambda :raw_input()[0]
-	
-queries = ['awesome','beautiful','shit','fuck','android','iphone','blackberry','windows','linux','apple','google']
 
-negative_file = open("negative.txt","w")
-positive_file = open("postive.txt","w")
+pos_file = open(pos_filename,"w")
+try:
+    for line in pos_file:
+        pos_count += 1 
+except IOError:
+    pos_count = 0
+neg_file = open(neg_filename,"w")
+try:
+    for line in neg_file:
+        neg_count += 1
+except IOError:
+    neg_count = 0
 
 query_post = str("track="+",".join([q for q in queries]))
-
-
 httprequest = urllib2.Request('http://stream.twitter.com/1/statuses/filter.json',query_post)
 auth = base64.b64encode('%s:%s' % (USER, PASS))
 httprequest.add_header('Authorization', "basic %s" % auth)
@@ -53,6 +64,7 @@ for item in stream:
         if keyReader == "win":
             os.system("cls")
         tweet_text = data['text'].encode('utf8')
+        print('Synt sentiment trainer | Totals: Postive (%s) Negative (%s)' % (pos_count,neg_count))
         print('\n')
         print tweet_text
         print('\n')
@@ -64,13 +76,15 @@ for item in stream:
             print("You excaped the dungeon!")
             break
         if key == '1':
-            positive_file.write("%s \n" % tweet_text)
+            pos_file.write("%s \n" % tweet_text)
+            pos_count += 1 
             print('\n')
             print("Comment saved as: Positive")
         if key == '2':
             print('\n')
             print("Comment Ignored as: Neutral")
         if key == '3':
-            negative_file.write("%s \n" % tweet_text)
+            neg_file.write("%s \n" % tweet_text)
+            neg_write += 1 
             print('\n')
             print("Comment saved as: Negative")
