@@ -1,18 +1,13 @@
-import urllib2, json, base64, sys, os, re, time, sqlite3
+import urllib2, json, base64, sys, os, re, time, synt
 from BeautifulSoup import BeautifulStoneSoup
-
-db_file = 'trainer_data.db'
 
 emoticons = ['-.-','xx','<3',':-{',': )',': (',';]',':{','={',':-}',':}','=}',':)',';)',':/','=/',';/','x(','x)',':D','T_T','o.-','O.-','-.o','-.O','X_X','x_x','XD','DX',':-$',':|','-_-','D:',':-)','^_^','=)','=]','=|','=[','=(',':(',':-(',':,(',':\'(',':-]',':-[',':]',':[','>.>','<.<']
 
 ignore_strings = ['RT', ':-P',':-p',';-P',';-p',':P',':p',';P',';p']
 
-if not os.path.exists(db_file):
-    conn = sqlite3.connect(db_file)
-    curs = conn.cursor()
-    curs.execute('''create table item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
+db = synt.db_init()
 
-def twitter_feed(sentiment, db_fle, last_id = None, **kwargs):
+def twitter_feed(sentiment, last_id = None, **kwargs):
     if sentiment == 'positive':
         query = ':)'
     if sentiment == 'negative':
@@ -28,10 +23,8 @@ def twitter_feed(sentiment, db_fle, last_id = None, **kwargs):
         pass
     if data:
         items = data['results']
-        conn = sqlite3.connect(db_file)
-        curs = conn.cursor()
-        curs.execute('SELECT COUNT() FROM item WHERE sentiment = ?',[sentiment])
-        total_rows = curs.fetchone()[0]
+        db.execute('SELECT COUNT() FROM item WHERE sentiment = ?',[sentiment])
+        total_rows = db.fetchone()[0]
         for item in items:
             text = item['text'].encode('utf8')
             if text:
@@ -55,7 +48,7 @@ def twitter_feed(sentiment, db_fle, last_id = None, **kwargs):
                     formatted_text = None
                 if formatted_text:
                     try:
-                        curs.execute('INSERT INTO item VALUES (NULL,?,?,?,?)',[item_id,formatted_text,text,sentiment])
+                        db.execute('INSERT INTO item VALUES (NULL,?,?,?,?)',[item_id,formatted_text,text,sentiment])
                         last_id = item_id
                         print sentiment,total_rows,formatted_text
                         total_rows += 1
@@ -69,5 +62,5 @@ pos_lastid = None
 
 while True:
     time.sleep(2)
-    pos_lastid = twitter_feed('positive',db_file,pos_lastid)
-    neg_lastid = twitter_feed('negative',db_file,neg_lastid)
+    pos_lastid = twitter_feed('positive',pos_lastid)
+    neg_lastid = twitter_feed('negative',neg_lastid)
