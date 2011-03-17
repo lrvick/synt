@@ -121,12 +121,13 @@ def get_classifier(generate=False,use_redis=False):
 def guess(text,classifier=None):
     if not classifier:
         classifier = get_classifier()
-    bag_of_words = gen_bow('text')
-    return classifier.classify(bag_of_words)
+    bag_of_words = gen_bow(text)
+    guess = classifier.classify(bag_of_words)
+    return guess
 
 def test(num_samples=None):
     if not num_samples:
-        num_samples = 1000
+        num_samples = 10000
     results_dict = []
     accurate_samples = 0
     classifier = get_classifier()
@@ -148,8 +149,7 @@ def test(num_samples=None):
         print ("------------------------------------------------------------------------------------------------------------------------------------------")
         if result[0] == True:
             accurate_samples += 1
-        total_accuracy = accurate_samples*100/num_samples
+        total_accuracy = accurate_samples*100.00/num_samples
+    classifier.show_most_informative_features(30)
     print("\n\rManual classifier accuracy result: %s%%" % total_accuracy) 
     print('\n\rNLTK classifier accuracy result: %.2f%%' % nltk_accuracy)
-
-test()
