@@ -17,12 +17,11 @@ use_gzip = False
 def db_init():
     if not os.path.exists(db_file):
         conn = sqlite3.connect(db_file)
-        curs = conn.cursor()
-        curs.execute('''create table item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
+        cursor = conn.cursor()
+        cursor.execute('''create table item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
     else:
         conn = sqlite3.connect(db_file)
-        curs = conn.cursor()
-    return conn.cursor()
+    return conn
 
 def gen_bow(text):
     try:
@@ -38,10 +37,11 @@ def gen_bow(text):
 
 def get_training_limit():
     db = db_init()
-    db.execute("SELECT COUNT(*) FROM item where sentiment = 'positive'")
-    pos_count = db.fetchone()[0]
-    db.execute("SELECT COUNT(*) FROM item where sentiment = 'negative'")
-    neg_count = db.fetchone()[0]
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'positive'")
+    pos_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'negative'")
+    neg_count = cursor.fetchone()[0]
     if neg_count > pos_count:
         limit = pos_count
     else:
@@ -50,14 +50,15 @@ def get_training_limit():
 
 def get_samples(limit=None):
     db = db_init()
+    cursor = conn.cursor()
     if not limit:
         limit = get_training_limit()
     else:
         limit = (int(limit)/2)
-    db.execute("SELECT * FROM item where sentiment = 'positive' LIMIT ?",[limit])
-    samples = db.fetchall()
-    db.execute("SELECT * FROM item where sentiment = 'negative' LIMIT ?",[limit])
-    samples += db.fetchall()
+    cursor.execute("SELECT * FROM item where sentiment = 'positive' LIMIT ?",[limit])
+    samples = cursor.fetchall()
+    cursor.execute("SELECT * FROM item where sentiment = 'negative' LIMIT ?",[limit])
+    samples += cursor.fetchall()
     return samples
 
 def gen_classifier_dict(samples=None):
@@ -94,7 +95,6 @@ def gen_classifier():
     return classifier
 
 def get_classifier(generate=False,use_redis=False):
-    db = db_init()
     classifier = False
     if generate == True:
         classifier = gen_classifier()
