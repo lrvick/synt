@@ -1,10 +1,11 @@
-import os, sys, sqlite3, cPickle, gzip, nltk
+import os, sys, sqlite3, cPickle, gzip, re, nltk
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.classify import NaiveBayesClassifier
 from nltk.tokenize import WordPunctTokenizer
 from nltk.metrics import BigramAssocMeasures
 from nltk.collocations import BigramCollocationFinder
+from BeautifulSoup import BeautifulStoneSoup
 
 db_file = 'sample_data.db'
 
@@ -14,6 +15,10 @@ use_redis = False
 
 use_gzip = False
 
+emoticons = ['<3','8)','8-)','8-}','8]','8-]','8-|','8(','8-(','8-[','8-{','-.-','xx','</3',':-{',': )',': (',';]',':{','={',':-}',':}','=}',':)',';)',':/','=/',';/','x(','x)',':D','T_T','o.-','O.-','-.o','-.O','X_X','x_x','XD','DX',':-$',':|','-_-','D:',':-)','^_^','=)','=]','=|','=[','=(',':(',':-(',':,(',':\'(',':-]',':-[',':]',':[','>.>','<.<']
+
+ignore_strings = ['RT',':-P',':-p',';-P',';-p',':P',':p',';P',';p']
+
 def db_init():
     if not os.path.exists(db_file):
         conn = sqlite3.connect(db_file)
@@ -22,6 +27,29 @@ def db_init():
     else:
         conn = sqlite3.connect(db_file)
     return conn
+
+def sanitize_text(text):
+    if not text:
+        return False
+    for string in ignore_strings:
+        if string in text:
+            return False
+    formatted_text = re.sub("http:\/\/.*/",'', text)
+    formatted_text = re.sub("@[A-Za-z0-9_]+",'', formatted_text)
+    formatted_text = re.sub("#[A-Za-z0-9_]+",'', formatted_text)
+    formatted_text = re.sub("^\s+",'', formatted_text)
+    formatted_text = re.sub("\s+",' ', formatted_text)
+    formatted_text = str(BeautifulStoneSoup(formatted_text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
+    if formatted_text:
+        for emoticon in emoticons:
+            try:
+                formatted_text = formatted_text.encode('ascii')
+                formatted_text = formatted_text.replace(emoticon,'')
+            except:
+                return False
+        return formatted_text
+    else: 
+        return False
 
 def gen_bow(text):
     try:
