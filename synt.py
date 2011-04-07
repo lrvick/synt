@@ -1,11 +1,15 @@
-import os, sys, sqlite3, cPickle, gzip, re, nltk
+import os, sys, string, sqlite3, cPickle, gzip, re, nltk
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.classify import NaiveBayesClassifier
-from nltk.tokenize import WordPunctTokenizer
+from nltk.tokenize.treebank import TreebankWordTokenizer
 from nltk.metrics import BigramAssocMeasures
 from nltk.collocations import BigramCollocationFinder
+from nltk.util import bigrams
+from nltk.featstruct import FeatStruct
+from nltk.probability import FreqDist, ConditionalFreqDist
 from BeautifulSoup import BeautifulStoneSoup
+from nltk import word_tokenize
 
 db_file = 'sample_data.db'
 
@@ -15,7 +19,11 @@ use_redis = False
 
 use_gzip = False
 
-emoticons = ['<3','8)','8-)','8-}','8]','8-]','8-|','8(','8-(','8-[','8-{','-.-','xx','</3',':-{',': )',': (',';]',':{','={',':-}',':}','=}',':)',';)',':/','=/',';/','x(','x)',':D','T_T','o.-','O.-','-.o','-.O','X_X','x_x','XD','DX',':-$',':|','-_-','D:',':-)','^_^','=)','=]','=|','=[','=(',':(',':-(',':,(',':\'(',':-]',':-[',':]',':[','>.>','<.<']
+num_samples = 200000
+
+max_tokens = 20000
+
+emoticons = [':-L',':L','<3','8)','8-)','8-}','8]','8-]','8-|','8(','8-(','8-[','8-{','-.-','xx','</3',':-{',': )',': (',';]',':{','={',':-}',':}','=}',':)',';)',':/','=/',';/','x(','x)',':D','T_T','O.o','o.o','o_O','o.-','O.-','-.o','-.O','X_X','x_x','XD','DX',':-$',':|','-_-','D:',':-)','^_^','=)','=]','=|','=[','=(',':(',':-(',':,(',':\'(',':-]',':-[',':]',':[','>.>','<.<']
 
 ignore_strings = ['RT',':-P',':-p',';-P',';-p',':P',':p',';P',';p']
 
@@ -40,6 +48,7 @@ def sanitize_text(text):
     formatted_text = re.sub("^\s+",'', formatted_text)
     formatted_text = re.sub("\s+",' ', formatted_text)
     formatted_text = str(BeautifulStoneSoup(formatted_text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
+    formatted_text = ''.join([c for c in formatted_text.lower() if re.match("[a-z\ \n\t]", c)])
     if formatted_text:
         for emoticon in emoticons:
             try:
@@ -47,7 +56,8 @@ def sanitize_text(text):
                 formatted_text = formatted_text.replace(emoticon,'')
             except:
                 return False
-        return formatted_text
+        tokens = word_tokenize(formatted_text)
+        return tokens
     else: 
         return False
 
@@ -58,14 +68,14 @@ def gen_bow(text):
         print e
         nltk.download('stopwords')
     stemmer = PorterStemmer()
-    tokenizer = WordPunctTokenizer()
+    tokenizer = TreebankWordTokenizer()
     tokens = set(stemmer.stem(x.lower()) for x in tokenizer.tokenize(text)) - set(stopwords.words('english')) - set('')
     bag_of_words = dict([(token, True) for token in tokens])
     return bag_of_words
 
 def get_training_limit():
     db = db_init()
-    cursor = conn.cursor()
+    cursor = db.cursor()
     cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'positive'")
     pos_count = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'negative'")
@@ -76,58 +86,109 @@ def get_training_limit():
         limit = neg_count
     return limit
 
-def get_samples(limit=None):
+def get_samples(limit=None,only_type=None):
     db = db_init()
-    cursor = conn.cursor()
+    cursor = db.cursor()
+    pos_samples = []
+    neg_samples = []
     if not limit:
         limit = get_training_limit()
-    else:
+    elif limit and not only_type:
         limit = (int(limit)/2)
-    cursor.execute("SELECT * FROM item where sentiment = 'positive' LIMIT ?",[limit])
-    samples = cursor.fetchall()
-    cursor.execute("SELECT * FROM item where sentiment = 'negative' LIMIT ?",[limit])
-    samples += cursor.fetchall()
+    if not only_type == 'negative':
+        cursor.execute("SELECT text,sentiment FROM item where sentiment = 'positive' LIMIT ?",[limit])
+        neg_samples = cursor.fetchall()
+    if not only_type == 'positive':
+        cursor.execute("SELECT text,sentiment FROM item where sentiment = 'negative' LIMIT ?",[limit])
+        pos_samples = cursor.fetchall()
+    samples = pos_samples + neg_samples
     return samples
 
-def gen_classifier_dict(samples=None):
-    if not samples:
-        samples = get_samples()
-    sample_num = len(samples)
-    classifier_dict = []
+def gen_classifier(disk_save=True,num_samples=False,max_tokens=False):
+    if not num_samples:
+        num_samples = 200000
+    if not max_tokens:
+        max_tokens = 20000
+    samples = get_samples(num_samples)
+    word_fd = FreqDist()
+    label_word_fd = ConditionalFreqDist()
+    score_fn = BigramAssocMeasures.chi_sq
+    top_tokens = {'negative':{},'positive':{}}
+    check_tokens = {'negative':{},'positive':{}}
+    all_tokens = []
+    train_tokens = []
     total_samples = len(samples)
+    total_tokens = 0
+    processed_tokens = 0
     processed_samples = 0
     for sample in samples:
-        percent = int(processed_samples*100/total_samples)
         processed_samples += 1
-        sys.stdout.write("\rGenerating Classifier Dict - Samples: %s/%s - %d%%\r" % (processed_samples,total_samples,percent))
+        percent = int(processed_samples*100/total_samples)
+        sys.stdout.write("\rGenerating Classifier Tokens - Samples: %s/%s - %d%%\r" % (processed_samples,total_samples,percent))
         sys.stdout.flush()
-        text = sample[2]
-        sentiment = sample[4]
-        bag_of_words = gen_bow(text)
-        if bag_of_words and sentiment:
-            classifier_dict.append((bag_of_words,sentiment))
-    sys.stdout.write("\rGenerating Classifier Dict - Samples: %s/%s - 100%%\r" % (processed_samples,total_samples))
-    sys.stdout.write("\n\r")
-    return classifier_dict
-
-def gen_classifier():
-    classifier_data = gen_classifier_dict()
-    classifier = NaiveBayesClassifier.train(classifier_data)
-    print("Saving classifier to disk as: %s" % classifier_file)
-    if use_gzip == True:
-        fp = gzip.open(classifier_file,'wb')
-    else:
-        fp = open(classifier_file,'wb')
-    cPickle.dump(classifier,fp)
-    fp.close()
-    return classifier
+        tokens = sanitize_text(sample[0])
+        sentiment = sample[1]
+        stemmer = PorterStemmer()
+        cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
+        for word in cleaned_words:
+            word_fd.inc(word.lower())
+            label_word_fd[sentiment].inc(word.lower())
+        try:
+            bigram_finder = BigramCollocationFinder.from_words(cleaned_words)
+            bigrams = bigram_finder.nbest(score_fn,100)
+        except:
+            pass
+        if bigrams:
+            for bigram in bigrams:
+                word_fd.inc(bigram)
+                label_word_fd[sentiment].inc(bigram)
+        else: 
+            bigrams = []
+        sample_tokens = bigrams
+        for word in cleaned_words:
+            sample_tokens.append(word)
+        all_tokens.append((dict([(token,True) for token in sample_tokens]),sentiment))
+    total_word_count = label_word_fd['negative'].N() + label_word_fd['positive'].N()
+    for sentiment in top_tokens.keys():
+        for word, freq in label_word_fd[sentiment].iteritems():
+            score = score_fn(label_word_fd[sentiment][word],(freq, label_word_fd[sentiment].N()), total_word_count)
+            top_tokens[sentiment][word] = score
+            limit = max_tokens/2
+        top_tokens[sentiment] = sorted(top_tokens[sentiment].iteritems(), key=lambda (w,s): s, reverse=True)[:limit]
+    print "\n\r"
+    for token_group in all_tokens:
+        tokens = token_group[0]
+        for token in tokens:
+            total_tokens +=1
+    check_tokens['negative'] = [token for token,score in top_tokens['negative']]
+    check_tokens['positive'] = [token for token,score in top_tokens['positive']]
+    for token_group in all_tokens:
+            sentiment = token_group[1]
+            tokens = token_group[0]
+            for token in tokens:
+                processed_tokens += 1
+                percent = int(processed_tokens*100/total_tokens)
+                sys.stdout.write("\rGenerating Optimal Training Set - Tokens: %s/%s - %d%%\r" % (processed_tokens,total_tokens,percent))
+                sys.stdout.flush()
+                if token in check_tokens[sentiment]:
+                    train_tokens.append(({token:True},sentiment))
+    print "\n\r"
+    classifier = NaiveBayesClassifier.train(train_tokens)
+    if disk_save:
+        print("Saving classifier to disk as: %s" % classifier_file)
+        if use_gzip == True:
+            fp = gzip.open(classifier_file,'wb')
+        else:
+            fp = open(classifier_file,'wb')
+        cPickle.dump(classifier,fp)
+        fp.close()
 
 def get_classifier(generate=False,use_redis=False):
     classifier = False
     if generate == True:
-        classifier = gen_classifier()
+        classifier = gen_classifier(True,num_samples,max_tokens)
     elif not os.path.exists(classifier_file):
-        classifier = gen_classifier()
+        classifier = gen_classifier(True,num_samples,max_tokens)
     else:
         if use_redis == True:
             if cache.get('synt_class'):
@@ -153,19 +214,30 @@ def guess(text,classifier=None):
     guess = classifier.classify(bag_of_words)
     return guess
 
-def test(num_samples=None):
+def test(classifier=None,num_samples=None):
     if not num_samples:
         num_samples = 10000
+    if not classifier:
+        classifier = get_classifier()
     results_dict = []
     accurate_samples = 0
-    classifier = get_classifier()
     samples = get_samples(num_samples)
-    nltk_testing_dict = gen_classifier_dict(samples)
+    #nltk_testing_dict = gen_classifier_dict(samples)
+    nltk_testing_dict = []
+    for sample in samples:
+        sentiment = sample[1]
+        stemmer = PorterStemmer()
+        tokens = sanitize_text(sample[0])
+        sample_tokens = []
+        cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
+        for word in cleaned_words:
+            sample_tokens.append(word)
+        nltk_testing_dict.append((dict([(token,True) for token in sample_tokens]),sentiment))
     nltk_accuracy = nltk.classify.util.accuracy(classifier,nltk_testing_dict) * 100
     for sample in samples:
-        text = sample[2]
+        text = sample[0]
         synt_guess = guess(text,classifier)
-        known = sample[4]
+        known = sample[1]
         if known == synt_guess:
             accuracy = True
         else:

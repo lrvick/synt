@@ -2,5 +2,8 @@
 ~*
 *.tmp
 *.bak
+*.pkl
+*.db
+*.gz
 positive.txt
 negative.txt
