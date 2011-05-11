@@ -36,9 +36,9 @@
     The first time you do a guess, it will generate and save a classifier blob based on
     200k samples, (100K neg, 100k pos). This default will get you around 80% accuracy.
 
-    You can adjust this, but going very far beyond 200k by adjusting some variables but 
-    at this time will probably make your computer cry and say mean things to you, before 
-    passing out.
+    You can adjust this, (by changing a couple hard-coded variables) but going very far 
+    beyond 200k at this time will probably make your computer cry and say mean things 
+    to you, before passing out.
   
 ## Notes ##
     
