@@ -27,6 +27,12 @@ emoticons = [':-L',':L','<3','8)','8-)','8-}','8]','8-]','8-|','8(','8-(','8-[',
 
 ignore_strings = ['RT',':-P',':-p',';-P',';-p',':P',':p',';P',';p']
 
+try:
+    stopwords.words('english')
+except Exception, e:
+    print e
+    nltk.download('stopwords')
+
 def db_init():
     if not os.path.exists(db_file):
         conn = sqlite3.connect(db_file)
@@ -62,11 +68,6 @@ def sanitize_text(text):
         return False
 
 def gen_bow(text):
-    try:
-        stopwords.words('english')
-    except Exception, e:
-        print e
-        nltk.download('stopwords')
     stemmer = PorterStemmer()
     tokenizer = TreebankWordTokenizer()
     tokens = set(stemmer.stem(x.lower()) for x in tokenizer.tokenize(text)) - set(stopwords.words('english')) - set('')

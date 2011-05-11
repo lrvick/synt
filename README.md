@@ -31,8 +31,14 @@
 
   2. From here, you can now begin to start evaluating text.
 
+    In a a python script:
+
         import synt
         synt.guess('My mother in law makes me do bad things and I think pandas are icky!')
+
+    Or on the command line:
+
+        python -c "import synt; synt.guess('I want to chase poodles. That makes me happy any joyful :-D')"
 
     The first time you do a guess, it will generate and save a classifier blob based on
     200k samples, (100K neg, 100k pos). This default will get you around 80% accuracy.
