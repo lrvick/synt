@@ -4,7 +4,7 @@
 
 ## About ##
 
-  Synt (pronounced: "cent") is a python script aiming to be a general
+  Synt (pronounced: "cent") is a python library aiming to be a general
   solution to identifying a given peice of text, particularly social 
   network statuses, as either negative, neutral, or positive.
 
@@ -31,6 +31,7 @@
 
   2. From here, you can now begin to start evaluating text.
 
+        import synt
         synt.guess('My mother in law makes me do bad things and I think pandas are icky!')
 
     The first time you do a guess, it will generate and save a classifier blob based on
