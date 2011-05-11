@@ -1,9 +1,46 @@
+# If this ignores something you want, add it by hand.
+
+# Python poop
+*.pyc
+*.wsgi
+
+# DB dregs
+*.db
+
+# vim vestiges
 *~
+*.swp
+*.swo
+*.swn
+*.swm
+
+# LaTeX leavings
+*.aux
+*.log
+*.pdf
+*.ps
+*.toc
+
+# Archive adipose
+*.tar
+*.tar.??
+*.zip
+*.rar
+*.7z
+*.gz
+*.bz2
+
+# Dotfile droppings
+.*
+
+# Django draff
+/static/
+migrations/
+
+# Lance's leftovers
 ~*
 *.tmp
 *.bak
 *.pkl
-*.db
-*.gz
 positive.txt
 negative.txt
