@@ -9,9 +9,9 @@ import sys
 import time
 from BeautifulSoup import BeautifulStoneSoup
 from nltk import word_tokenize
+from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
 from nltk.collocations import BigramCollocationFinder
-from nltk.corpus import stopwords
 from nltk.featstruct import FeatStruct
 from nltk.metrics import BigramAssocMeasures
 from nltk.probability import FreqDist, ConditionalFreqDist
@@ -19,9 +19,11 @@ from nltk.stem import PorterStemmer
 from nltk.tokenize.treebank import TreebankWordTokenizer
 from nltk.util import bigrams
 
-db_file = 'sample_data.db'
+db_file = 'synt.db'
 
 classifier_file = 'classifier.pkl'
+
+tokens_file = 'tokens.txt'
 
 use_redis = False
 
@@ -126,22 +128,13 @@ def get_samples(limit=None, only_type=None):
     return samples
 
 
-def gen_classifier(disk_save=True, num_samples=False, max_tokens=False):
-    if not num_samples:
-        num_samples = 200000
-    if not max_tokens:
-        max_tokens = 20000
-    samples = get_samples(num_samples)
+def gen_tokens(num_samples=None):
+    all_tokens = []
+    score_fn = BigramAssocMeasures.chi_sq
     word_fd = FreqDist()
     label_word_fd = ConditionalFreqDist()
-    score_fn = BigramAssocMeasures.chi_sq
-    top_tokens = {'negative': {}, 'positive': {}}
-    check_tokens = {'negative': {}, 'positive': {}}
-    all_tokens = []
-    train_tokens = []
+    samples = get_samples(num_samples)
     total_samples = len(samples)
-    total_tokens = 0
-    processed_tokens = 0
     processed_samples = 0
     lastout = time.time()
     for sample in samples:
@@ -154,7 +147,10 @@ def gen_classifier(disk_save=True, num_samples=False, max_tokens=False):
         tokens = sanitize_text(sample[0])
         sentiment = sample[1]
         stemmer = PorterStemmer()
-        cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
+        try:
+            cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
+        except Exception,e:
+            print 'Unable to format string %s' % str(sample)
         for word in cleaned_words:
             word_fd.inc(word.lower())
             label_word_fd[sentiment].inc(word.lower())
@@ -173,6 +169,44 @@ def gen_classifier(disk_save=True, num_samples=False, max_tokens=False):
         for word in cleaned_words:
             sample_tokens.append(word)
         all_tokens.append((dict([(token, True) for token in sample_tokens]), sentiment))
+    if use_gzip == True:
+        fp = gzip.open(tokens_file,'wb')
+    else:
+        fp = open(tokens_file,'wb')
+    fp.writelines(repr(all_tokens))
+    fp.close()
+    return all_tokens
+
+def get_tokens(generate=False,num_samples=None):
+    if generate == True:
+        print('Generating new tokens from samples')
+        tokens = gen_tokens(num_samples)
+    elif not os.path.exists(tokens_file):
+        print 'Tokens Cache file not found: %s' % tokens_file
+        print 'Generating new tokens from samples'
+        tokens = gen_tokens(num_samples)
+    else:
+        total_size = os.path.getsize(tokens_file)
+        total_read = 0
+        tokens_chunks = str()
+        if use_gzip == True:
+            fp = gzip.open(tokens_file,'rb')
+        else:
+            fp = open(tokens_file,'rw')
+    return tokens
+
+def gen_classifier(disk_save=True,num_samples=False,max_tokens=False):
+    all_tokens = get_tokens()
+    if not max_tokens:
+        max_tokens = 20000
+    word_fd = FreqDist()
+    score_fn = BigramAssocMeasures.chi_sq
+    label_word_fd = ConditionalFreqDist()
+    top_tokens = {'negative':{},'positive':{}}
+    check_tokens = {'negative':{},'positive':{}}
+    train_tokens = []
+    total_tokens = 0
+    processed_tokens = 0
     total_word_count = label_word_fd['negative'].N() + label_word_fd['positive'].N()
     for sentiment in top_tokens.keys():
         for word, freq in label_word_fd[sentiment].iteritems():
@@ -180,16 +214,10 @@ def gen_classifier(disk_save=True, num_samples=False, max_tokens=False):
             top_tokens[sentiment][word] = score
             limit = max_tokens / 2
         top_tokens[sentiment] = sorted(top_tokens[sentiment].iteritems(), key=lambda (w, s): s, reverse=True)[:limit]
-    print "\n\r"
-    for token_group in all_tokens:
-        tokens = token_group[0]
-        for token in tokens:
-            total_tokens += 1
-    check_tokens['negative'] = [token for token, score in top_tokens['negative']]
-    check_tokens['positive'] = [token for token, score in top_tokens['positive']]
     for token_group in all_tokens:
             sentiment = token_group[1]
             tokens = token_group[0]
+            output_delay = 250
             for token in tokens:
                 processed_tokens += 1
                 if ((time.time() - lastout) > 0.5):  # Spamming stdout slows the process
@@ -197,8 +225,8 @@ def gen_classifier(disk_save=True, num_samples=False, max_tokens=False):
                     sys.stdout.write("\rGenerating Optimal Training Set - Tokens: %s/%s - %d%%\r" % (processed_tokens, total_tokens, percent))
                     sys.stdout.flush()
                     lastout = time.time()
-                if token in check_tokens[sentiment]:
-                    train_tokens.append(({token: True}, sentiment))
+                if token in [token for token,score in top_tokens[sentiment]]:
+                    train_tokens.append(({token:True},sentiment))
     print "\n\r"
     classifier = NaiveBayesClassifier.train(train_tokens)
     if disk_save:
@@ -209,6 +237,7 @@ def gen_classifier(disk_save=True, num_samples=False, max_tokens=False):
             fp = open(classifier_file, 'wb')
         cPickle.dump(classifier, fp)
         fp.close()
+    return classifier
 
 
 def get_classifier(generate=False, use_redis=False):
@@ -248,6 +277,7 @@ def test(classifier=None, num_samples=None):
     if not num_samples:
         num_samples = 10000
     if not classifier:
+        print "Classifier not provided, fetching/generating one."
         classifier = get_classifier()
     results_dict = []
     accurate_samples = 0
