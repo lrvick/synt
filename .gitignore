@@ -44,3 +44,4 @@ migrations/
 *.pkl
 positive.txt
 negative.txt
+celerybeat-schedule
