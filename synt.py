@@ -23,7 +23,7 @@ db_file = 'synt.db'
 
 classifier_file = 'classifier.pkl'
 
-tokens_file = 'tokens.txt'
+tokens_file = 'tokens.pkl.gz'
 
 use_redis = False
 
@@ -81,11 +81,10 @@ def sanitize_text(text):
                 formatted_text = formatted_text.replace(emoticon, '')
             except:
                 return False
-        tokens = word_tokenize(formatted_text)
+        tokens = gen_bow(formatted_text)
         return tokens
     else:
         return False
-
 
 def gen_bow(text):
     stemmer = PorterStemmer()
@@ -127,53 +126,38 @@ def get_samples(limit=None, only_type=None):
     samples = pos_samples + neg_samples
     return samples
 
-
 def gen_tokens(num_samples=None):
     all_tokens = []
     score_fn = BigramAssocMeasures.chi_sq
-    word_fd = FreqDist()
     label_word_fd = ConditionalFreqDist()
     samples = get_samples(num_samples)
     total_samples = len(samples)
     processed_samples = 0
     lastout = time.time()
-    for sample in samples:
+    for text,sentiment in samples:
         processed_samples += 1
         if ((time.time() - lastout) > 0.5):
             percent = int(processed_samples * 100 / total_samples)
             sys.stdout.write("\rGenerating Classifier Tokens - Samples: %s/%s - %d%%\r" % (processed_samples, total_samples, percent))
             sys.stdout.flush()
             lastout = time.time()
-        tokens = sanitize_text(sample[0])
-        sentiment = sample[1]
+        tokens = sanitize_text(text)
         stemmer = PorterStemmer()
         try:
             cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
         except Exception,e:
             print 'Unable to format string %s' % str(sample)
-        for word in cleaned_words:
-            word_fd.inc(word.lower())
-            label_word_fd[sentiment].inc(word.lower())
         try:
             bigram_finder = BigramCollocationFinder.from_words(cleaned_words)
-            bigrams = bigram_finder.nbest(score_fn, 100)
+            cleaned_words += bigram_finder.nbest(score_fn, 100)
         except:
             pass
-        if bigrams:
-            for bigram in bigrams:
-                word_fd.inc(bigram)
-                label_word_fd[sentiment].inc(bigram)
-        else:
-            bigrams = []
-        sample_tokens = bigrams
-        for word in cleaned_words:
-            sample_tokens.append(word)
-        all_tokens.append((dict([(token, True) for token in sample_tokens]), sentiment))
+        all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     if use_gzip == True:
         fp = gzip.open(tokens_file,'wb')
     else:
         fp = open(tokens_file,'wb')
-    fp.writelines(repr(all_tokens))
+    cPickle.dump(all_tokens, fp, protocol=cPickle.HIGHEST_PROTOCOL)
     fp.close()
     return all_tokens
 
@@ -193,13 +177,13 @@ def get_tokens(generate=False,num_samples=None):
             fp = gzip.open(tokens_file,'rb')
         else:
             fp = open(tokens_file,'rw')
+            tokens = cPickle.loads(fp.read())
     return tokens
 
-def gen_classifier(disk_save=True,num_samples=False,max_tokens=False):
-    all_tokens = get_tokens()
-    if not max_tokens:
-        max_tokens = 20000
-    word_fd = FreqDist()
+
+def gen_classifier(disk_save=True,num_samples=200000,max_tokens=20000):
+    all_tokens = get_tokens(False,max_tokens)
+    limit = max_tokens / 2
     score_fn = BigramAssocMeasures.chi_sq
     label_word_fd = ConditionalFreqDist()
     top_tokens = {'negative':{},'positive':{}}
@@ -207,37 +191,42 @@ def gen_classifier(disk_save=True,num_samples=False,max_tokens=False):
     train_tokens = []
     total_tokens = 0
     processed_tokens = 0
+    for tokens,sentiment in all_tokens:
+        for token in tokens:
+            label_word_fd[sentiment].inc(token)
     total_word_count = label_word_fd['negative'].N() + label_word_fd['positive'].N()
     for sentiment in top_tokens.keys():
         for word, freq in label_word_fd[sentiment].iteritems():
             score = score_fn(label_word_fd[sentiment][word], (freq, label_word_fd[sentiment].N()), total_word_count)
             top_tokens[sentiment][word] = score
-            limit = max_tokens / 2
-        top_tokens[sentiment] = sorted(top_tokens[sentiment].iteritems(), key=lambda (w, s): s, reverse=True)[:limit]
-    for token_group in all_tokens:
-            sentiment = token_group[1]
-            tokens = token_group[0]
-            output_delay = 250
-            for token in tokens:
-                processed_tokens += 1
-                if ((time.time() - lastout) > 0.5):  # Spamming stdout slows the process
-                    percent = int(processed_tokens * 100 / total_tokens)
-                    sys.stdout.write("\rGenerating Optimal Training Set - Tokens: %s/%s - %d%%\r" % (processed_tokens, total_tokens, percent))
-                    sys.stdout.flush()
-                    lastout = time.time()
-                if token in [token for token,score in top_tokens[sentiment]]:
-                    train_tokens.append(({token:True},sentiment))
-    print "\n\r"
-    classifier = NaiveBayesClassifier.train(train_tokens)
-    if disk_save:
-        print("Saving classifier to disk as: %s" % classifier_file)
-        if use_gzip == True:
-            fp = gzip.open(classifier_file, 'wb')
-        else:
-            fp = open(classifier_file, 'wb')
-        cPickle.dump(classifier, fp)
-        fp.close()
-    return classifier
+        top_tokens[sentiment] = sorted(top_tokens[sentiment].iteritems(), key=lambda (w, s): s, reverse=True)[:20]
+    
+    for sentiment in top_tokens.keys():
+        for token in top_tokens[sentiment]:
+            print sentiment,token
+    #for tokens,sentiment in all_tokens:
+    #        output_delay = 250
+    #        lastout = time.time()
+    #        for token in tokens:
+    #            processed_tokens += 1
+    #            if ((time.time() - lastout) > 0.5):  # Spamming stdout slows the process
+    #                percent = int(processed_tokens * 100 / total_tokens)
+    #                sys.stdout.write("\rGenerating Optimal Training Set - Tokens: %s/%s - %d%%\r" % (processed_tokens, total_tokens, percent))
+    #                sys.stdout.flush()
+    #                lastout = time.time()
+    #            if token in [token for token,score in top_tokens[sentiment]]:
+    #                train_tokens.append(({token:True},sentiment))
+    #print "\n\r"
+    #classifier = NaiveBayesClassifier.train(train_tokens)
+    #if disk_save:
+    #    print("Saving classifier to disk as: %s" % classifier_file)
+    #    if use_gzip == True:
+    #        fp = gzip.open(classifier_file, 'wb')
+    #    else:
+    #        fp = open(classifier_file, 'wb')
+    #    cPickle.dump(classifier, fp)
+    #    fp.close()
+    #return classifier
 
 
 def get_classifier(generate=False, use_redis=False):
@@ -278,7 +267,7 @@ def test(classifier=None, num_samples=None):
         num_samples = 10000
     if not classifier:
         print "Classifier not provided, fetching/generating one."
-        classifier = get_classifier()
+        classifier = get_classifier(20000)
     results_dict = []
     accurate_samples = 0
     samples = get_samples(num_samples)
@@ -313,3 +302,6 @@ def test(classifier=None, num_samples=None):
     classifier.show_most_informative_features(30)
     print("\n\rManual classifier accuracy result: %s%%" % total_accuracy)
     print('\n\rNLTK classifier accuracy result: %.2f%%' % nltk_accuracy)
+
+if __name__=="__main__":
+    test()
