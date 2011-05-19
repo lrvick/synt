@@ -181,52 +181,58 @@ def get_tokens(generate=False,num_samples=None):
     return tokens
 
 
-def gen_classifier(disk_save=True,num_samples=200000,max_tokens=20000):
-    all_tokens = get_tokens(False,max_tokens)
+def get_top_tokens(all_tokens=None,num_samples=200000,max_tokens=20000):
+    if not all_tokens:
+        all_tokens = get_tokens(False,num_samples)
     limit = max_tokens / 2
     score_fn = BigramAssocMeasures.chi_sq
     label_word_fd = ConditionalFreqDist()
     top_tokens = {'negative':{},'positive':{}}
-    check_tokens = {'negative':{},'positive':{}}
     train_tokens = []
     total_tokens = 0
     processed_tokens = 0
     for tokens,sentiment in all_tokens:
         for token in tokens:
             label_word_fd[sentiment].inc(token)
+            total_tokens += 1
     total_word_count = label_word_fd['negative'].N() + label_word_fd['positive'].N()
     for sentiment in top_tokens.keys():
         for word, freq in label_word_fd[sentiment].iteritems():
             score = score_fn(label_word_fd[sentiment][word], (freq, label_word_fd[sentiment].N()), total_word_count)
             top_tokens[sentiment][word] = score
-        top_tokens[sentiment] = sorted(top_tokens[sentiment].iteritems(), key=lambda (w, s): s, reverse=True)[:20]
-    
-    for sentiment in top_tokens.keys():
-        for token in top_tokens[sentiment]:
-            print sentiment,token
-    #for tokens,sentiment in all_tokens:
-    #        output_delay = 250
-    #        lastout = time.time()
-    #        for token in tokens:
-    #            processed_tokens += 1
-    #            if ((time.time() - lastout) > 0.5):  # Spamming stdout slows the process
-    #                percent = int(processed_tokens * 100 / total_tokens)
-    #                sys.stdout.write("\rGenerating Optimal Training Set - Tokens: %s/%s - %d%%\r" % (processed_tokens, total_tokens, percent))
-    #                sys.stdout.flush()
-    #                lastout = time.time()
-    #            if token in [token for token,score in top_tokens[sentiment]]:
-    #                train_tokens.append(({token:True},sentiment))
-    #print "\n\r"
-    #classifier = NaiveBayesClassifier.train(train_tokens)
-    #if disk_save:
-    #    print("Saving classifier to disk as: %s" % classifier_file)
-    #    if use_gzip == True:
-    #        fp = gzip.open(classifier_file, 'wb')
-    #    else:
-    #        fp = open(classifier_file, 'wb')
-    #    cPickle.dump(classifier, fp)
-    #    fp.close()
-    #return classifier
+        top_tokens[sentiment] = sorted(top_tokens[sentiment].iteritems(), key=lambda (w, s): s, reverse=True)[:limit]
+
+    for tokens,sentiment in all_tokens:
+            lastout = time.time()
+            for token in tokens:
+                processed_tokens += 1
+                if ((time.time() - lastout) > 0.5):
+                    percent = int(processed_tokens * 100 / total_tokens)
+                    sys.stdout.write("\rGenerating Optimal Training Set - Tokens: %s/%s - %d%%\r" % (processed_tokens, total_tokens, percent))
+                    sys.stdout.flush()
+                    lastout = time.time()
+                if token in [token for token,score in top_tokens[sentiment]]:
+                    train_tokens.append(({token:True},sentiment))
+    return train_tokens
+   
+
+def gen_classifier(disk_save=True,num_samples=200000,max_tokens=None):
+    all_tokens = get_tokens(False,num_samples)
+    if (max_tokens):
+        train_tokens = get_top_tokens(all_tokens,num_samples,max_tokens)
+    else:
+        train_tokens = all_tokens 
+    classifier = NaiveBayesClassifier.train(all_tokens)
+    print "\n\r"
+    if disk_save:
+        print("Saving classifier to disk as: %s" % classifier_file)
+        if use_gzip == True:
+            fp = gzip.open(classifier_file, 'wb')
+        else:
+            fp = open(classifier_file, 'wb')
+        cPickle.dump(classifier, fp)
+        fp.close()
+    return classifier
 
 
 def get_classifier(generate=False, use_redis=False):
@@ -264,10 +270,10 @@ def guess(text, classifier=None):
 
 def test(classifier=None, num_samples=None):
     if not num_samples:
-        num_samples = 10000
+        num_samples = 200000
     if not classifier:
         print "Classifier not provided, fetching/generating one."
-        classifier = get_classifier(20000)
+        classifier = get_classifier(num_samples)
     results_dict = []
     accurate_samples = 0
     samples = get_samples(num_samples)
