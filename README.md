@@ -26,7 +26,7 @@
     Optionally you can use the rather large ( 2mil tweets / 100M ) pre-collected database 
     found in the downloads section on github
 
-        wget -O - "https://github.com/downloads/lrvick/synt/sample_data.bz2" | bzcat | sqlite3 sample_data.db
+        wget -O - "https://github.com/downloads/Tawlk/synt/sample_data.bz2" | bzcat | sqlite3 sample_data.db
         
 
   2. From here, you can now begin to start evaluating text.

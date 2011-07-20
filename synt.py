@@ -19,7 +19,7 @@ from nltk.stem import PorterStemmer
 from nltk.tokenize.treebank import TreebankWordTokenizer
 from nltk.util import bigrams
 
-db_file = 'synt.db'
+db_file = 'sample_data.db'
 
 classifier_file = 'classifier.pkl'
 
