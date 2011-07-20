@@ -1,6 +1,6 @@
 # Synt #
   
-  <http://github.com/lrvick/synt>
+  <http://github.com/Tawlk/synt>
 
 ## About ##
 
