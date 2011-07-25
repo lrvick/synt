@@ -5,6 +5,7 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
 from nltk.collocations import BigramCollocationFinder
+from nltk.probability import DictionaryProbDist
 from nltk.stem import PorterStemmer
 from nltk.tokenize.treebank import TreebankWordTokenizer
 from nltk.util import bigrams
@@ -109,7 +110,7 @@ def get_samples(limit=None, only_type=None):
 
 
 def get_tokens(num_samples=None):
-    all_tokens = []
+    all_tokens = {}
     stemmer = PorterStemmer()
     samples = get_samples(num_samples)
     for text,sentiment in samples:
@@ -123,14 +124,22 @@ def get_tokens(num_samples=None):
             cleaned_words += bigram_finder.nbest(score_fn, 100)
         except:
             pass
-        all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
+        #all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
+        true_probdist = DictionaryProbDist({True:1})
+        for token in cleaned_words:
+            all_tokens[(sentiment, token)] = true_probdist
     return all_tokens
 
 
 def get_classifier(num_samples=200000):
-    all_tokens = get_tokens(num_samples)
-    classifier = NaiveBayesClassifier.train(all_tokens)
-    return classifier
+    num_samples = 500
+    feature_probdist = get_tokens(num_samples)
+    #print feature_probdist
+    label_probdist = DictionaryProbDist({'positive':0.5,'negative':0.5})
+    classifier = NaiveBayesClassifier(label_probdist,feature_probdist)
+    #classifier.show_most_informative_features(30)
+    print classifier.classify({'happy':True})
+    #return classifier
 
 
 def guess(text, classifier=None):
@@ -140,8 +149,8 @@ def guess(text, classifier=None):
     guess = classifier.classify(bag_of_words)
     prob = classifier.prob_classify(bag_of_words)
 
-    return guess,[(prob.prob(sample),sample) for sample in prob.samples()]
-
+    #return guess,[(prob.prob(sample),sample) for sample in prob.samples()]
+    return guess
 
 
 def test(train_samples=200000,test_samples=200000):
@@ -184,4 +193,6 @@ def test(train_samples=200000,test_samples=200000):
 
 
 if __name__=="__main__":
-    test(500,500)
+    #test(5000,500)
+    get_classifier(500)
+
