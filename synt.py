@@ -51,6 +51,7 @@ def sanitize_text(text):
     formatted_text = re.sub("#[A-Za-z0-9_]+", '', formatted_text)
     formatted_text = re.sub("^\s+", '', formatted_text)
     formatted_text = re.sub("\s+", ' ', formatted_text)
+    formatted_text = re.sub('(\w)\\1{2,}','\\1\\1', formatted_text) #remove occurence of more than two consecutive repeating chars
     formatted_text = str(BeautifulStoneSoup(formatted_text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
     formatted_text = ''.join([c for c in formatted_text.lower() if re.match("[a-z\ \n\t]", c)])
     if formatted_text:
@@ -66,6 +67,7 @@ def sanitize_text(text):
         return False
 
 def gen_bow(text):
+    """ Generate bag of words."""
     stemmer = PorterStemmer()
     tokenizer = TreebankWordTokenizer()
     tokens = set(stemmer.stem(x.lower()) for x in tokenizer.tokenize(text)) - set(stopwords.words('english')) - set('')
@@ -136,7 +138,10 @@ def guess(text, classifier=None):
         classifier = get_classifier()
     bag_of_words = gen_bow(text)
     guess = classifier.classify(bag_of_words)
-    return guess
+    prob = classifier.prob_classify(bag_of_words)
+
+    return guess,[(prob.prob(sample),sample) for sample in prob.samples()]
+
 
 
 def test(train_samples=200000,test_samples=200000):
