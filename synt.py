@@ -4,11 +4,9 @@ import sqlite3
 import nltk
 from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
-from nltk.collocations import BigramCollocationFinder
-from nltk.probability import DictionaryProbDist
-from nltk.stem import PorterStemmer
+from nltk.probability import DictionaryProbDist, ELEProbDist, FreqDist
 from nltk.tokenize.treebank import TreebankWordTokenizer
-from nltk.util import bigrams
+from collections import defaultdict
 from BeautifulSoup import BeautifulStoneSoup
 
 db_file = 'sample_data.db'
@@ -69,9 +67,8 @@ def sanitize_text(text):
 
 def gen_bow(text):
     """ Generate bag of words."""
-    stemmer = PorterStemmer()
     tokenizer = TreebankWordTokenizer()
-    tokens = set(stemmer.stem(x.lower()) for x in tokenizer.tokenize(text)) - set(stopwords.words('english')) - set('')
+    tokens = set(x.lower() for x in tokenizer.tokenize(text)) - set(stopwords.words('english')) - set('')
     bag_of_words = dict([(token, True) for token in tokens])
     return bag_of_words
 
@@ -110,36 +107,42 @@ def get_samples(limit=None, only_type=None):
 
 
 def get_tokens(num_samples=None):
-    all_tokens = {}
-    stemmer = PorterStemmer()
+    all_tokens = []
     samples = get_samples(num_samples)
     for text,sentiment in samples:
         tokens = sanitize_text(text)
         try:
-            cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
+            cleaned_words = set(w.lower() for w in tokens) - set(stopwords.words('english')) - set('')
         except Exception,e:
             print 'Unable to format string %s' % str(sample)
-        try:
-            bigram_finder = BigramCollocationFinder.from_words(cleaned_words)
-            cleaned_words += bigram_finder.nbest(score_fn, 100)
-        except:
-            pass
-        #all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
-        true_probdist = DictionaryProbDist({True:1})
-        for token in cleaned_words:
-            all_tokens[(sentiment, token)] = true_probdist
+        all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
-
 def get_classifier(num_samples=200000):
-    num_samples = 500
-    feature_probdist = get_tokens(num_samples)
-    #print feature_probdist
-    label_probdist = DictionaryProbDist({'positive':0.5,'negative':0.5})
+    labeled_featuresets = get_tokens(num_samples)
+    label_freqdist = FreqDist()
+    feature_freqdist = defaultdict(FreqDist)
+    feature_values = defaultdict(set)
+    fnames = set()
+    for featureset, label in labeled_featuresets: 
+              label_freqdist.inc(label) 
+              for fname, fval in featureset.items(): 
+                  feature_freqdist[label, fname].inc(fval) 
+                  feature_values[fname].add(fval) 
+                  fnames.add(fname)
+    for label in label_freqdist:
+        num_samples = label_freqdist[label]
+        for fname in fnames:
+            count = feature_freqdist[label, fname].N()
+            feature_freqdist[label, fname].inc(None, num_samples-count)
+            feature_values[fname].add(None)
+    label_probdist = ELEProbDist(label_freqdist)
+    feature_probdist = {}
+    for ((label, fname), freqdist) in feature_freqdist.items():
+        probdist = ELEProbDist(freqdist, bins=len(feature_values[fname]))
+        feature_probdist[label,fname] = probdist
     classifier = NaiveBayesClassifier(label_probdist,feature_probdist)
-    #classifier.show_most_informative_features(30)
-    print classifier.classify({'happy':True})
-    #return classifier
+    return classifier
 
 
 def guess(text, classifier=None):
@@ -163,10 +166,9 @@ def test(train_samples=200000,test_samples=200000):
     samples = get_samples(test_samples)
     for sample in samples:
         sentiment = sample[1]
-        stemmer = PorterStemmer()
         tokens = sanitize_text(sample[0])
         sample_tokens = []
-        cleaned_words = set(stemmer.stem(w.lower()) for w in tokens) - set(stopwords.words('english')) - set('')
+        cleaned_words = set(w.lower() for w in tokens) - set(stopwords.words('english')) - set('')
         for word in cleaned_words:
             sample_tokens.append(word)
         nltk_testing_dict.append((dict([(token, True) for token in sample_tokens]), sentiment))
@@ -186,13 +188,13 @@ def test(train_samples=200000,test_samples=200000):
         print ("------------------------------------------------------------------------------------------------------------------------------------------")
         if result[0] == True:
             accurate_samples += 1
-        total_accuracy = accurate_samples * 100.00 / train_samples
+        total_accuracy = (accurate_samples * 100.00 / train_samples) * 100
     classifier.show_most_informative_features(30)
     print("\n\rManual classifier accuracy result: %s%%" % total_accuracy)
     print('\n\rNLTK classifier accuracy result: %.2f%%' % nltk_accuracy)
 
 
 if __name__=="__main__":
-    #test(5000,500)
-    get_classifier(500)
+    test(50000,500)
+    #get_classifier(500)
 
