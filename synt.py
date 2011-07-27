@@ -2,12 +2,14 @@ import os
 import re
 import sqlite3
 import nltk
+import redis
+from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
 from nltk.probability import DictionaryProbDist, ELEProbDist, FreqDist
 from nltk.tokenize.treebank import TreebankWordTokenizer
-from collections import defaultdict
 from BeautifulSoup import BeautifulStoneSoup
+from utils import RedisFreqDist
 
 db_file = 'sample_data.db'
 
@@ -118,24 +120,35 @@ def get_tokens(num_samples=None):
         all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
-def get_classifier(num_samples=200000):
+def train_classifier(num_samples=200000):
+    r = redis.Redis()
+    r.flushdb()
     labeled_featuresets = get_tokens(num_samples)
-    label_freqdist = FreqDist()
-    feature_freqdist = defaultdict(FreqDist)
+    #label_freqdist = FreqDist()
+    #feature_freqdist = defaultdict(FreqDist)
+    label_freqdist = RedisFreqDist()
+    feature_freqdist = defaultdict(RedisFreqDist)
     feature_values = defaultdict(set)
     fnames = set()
+    count = len(labeled_featuresets)
     for featureset, label in labeled_featuresets: 
-              label_freqdist.inc(label) 
-              for fname, fval in featureset.items(): 
-                  feature_freqdist[label, fname].inc(fval) 
-                  feature_values[fname].add(fval) 
-                  fnames.add(fname)
+        count -= 1
+        label_freqdist.inc(label) 
+        for fname, fval in featureset.items():
+            feature_freqdist[label, fname].inc(fval) 
+            feature_values[fname].add(fval) 
+            fnames.add(fname)
     for label in label_freqdist:
         num_samples = label_freqdist[label]
         for fname in fnames:
             count = feature_freqdist[label, fname].N()
             feature_freqdist[label, fname].inc(None, num_samples-count)
             feature_values[fname].add(None)
+
+def get_classifier(num_samples=200000):
+    train_classifier(num_samples)
+    label_freqdist = RedisFreqDist()
+    feature_freqdist = defaultdict(RedisFreqDist)
     label_probdist = ELEProbDist(label_freqdist)
     feature_probdist = {}
     for ((label, fname), freqdist) in feature_freqdist.items():
@@ -143,7 +156,6 @@ def get_classifier(num_samples=200000):
         feature_probdist[label,fname] = probdist
     classifier = NaiveBayesClassifier(label_probdist,feature_probdist)
     return classifier
-
 
 def guess(text, classifier=None):
     if not classifier:
@@ -195,6 +207,6 @@ def test(train_samples=200000,test_samples=200000):
 
 
 if __name__=="__main__":
-    test(50000,500)
+    test(500,500)
     #get_classifier(500)
 
