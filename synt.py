@@ -120,8 +120,8 @@ def get_tokens(num_samples=None):
         all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
-def train_classifier(num_samples=200000,redis=False):
-    if redis is True:
+def train_classifier(num_samples=200000,use_redis=False):
+    if use_redis is True:
         label_freqdist = RedisFreqDist()
         feature_freqdist = defaultdict(RedisFreqDist)
         r = redis.Redis()
@@ -148,8 +148,8 @@ def train_classifier(num_samples=200000,redis=False):
             feature_values[fname].add(None)
     return label_freqdist,feature_freqdist,feature_values
 
-def get_classifier(num_samples=200000,redis=False,train=False):
-    if redis is True:
+def get_classifier(num_samples=200000,use_redis=False,train=False):
+    if use_redis is True:
         if train is True:
             label_freqdist,feature_freqdist,feature_values = train_classifier(num_samples,True)
         else:
@@ -182,7 +182,7 @@ def test(train_samples=200000,test_samples=200000):
     nltk_testing_dict = []
     accurate_samples = 0
     print "Building Classifier with %s Training Samples" % train_samples
-    classifier = get_classifier(train_samples,redis=False)
+    classifier = get_classifier(train_samples,use_redis=False)
     print "Preparing %s Testing Samples" % test_samples
     samples = get_samples(test_samples)
     for sample in samples:
@@ -216,7 +216,12 @@ def test(train_samples=200000,test_samples=200000):
 
 
 if __name__=="__main__":
+    #with redis
+    #label_freqdist,feature_freqdist,feature_values = train_classifier(2,True)
+    #print feature_freqdist
+    
+    #without redis
     #label_freqdist,feature_freqdist,feature_values = train_classifier(2,False)
     #print feature_freqdist
-    test(500,500)
 
+    test(500,500)
