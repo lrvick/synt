@@ -120,18 +120,20 @@ def get_tokens(num_samples=None):
         all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
-def train_classifier(num_samples=200000):
-    r = redis.Redis()
-    r.flushdb()
+def train_classifier(num_samples=200000,redis=False):
+    if redis is True:
+        label_freqdist = RedisFreqDist()
+        feature_freqdist = defaultdict(RedisFreqDist)
+        r = redis.Redis()
+        r.flushdb()
+    else:
+        label_freqdist = FreqDist()
+        feature_freqdist = defaultdict(FreqDist)
     labeled_featuresets = get_tokens(num_samples)
-    #label_freqdist = FreqDist()
-    #feature_freqdist = defaultdict(FreqDist)
-    label_freqdist = RedisFreqDist()
-    feature_freqdist = defaultdict(RedisFreqDist)
     feature_values = defaultdict(set)
     fnames = set()
     count = len(labeled_featuresets)
-    for featureset, label in labeled_featuresets: 
+    for featureset, label in labeled_featuresets:
         count -= 1
         label_freqdist.inc(label) 
         for fname, fval in featureset.items():
@@ -144,11 +146,18 @@ def train_classifier(num_samples=200000):
             count = feature_freqdist[label, fname].N()
             feature_freqdist[label, fname].inc(None, num_samples-count)
             feature_values[fname].add(None)
+    return label_freqdist,feature_freqdist,feature_values
 
-def get_classifier(num_samples=200000):
-    train_classifier(num_samples)
-    label_freqdist = RedisFreqDist()
-    feature_freqdist = defaultdict(RedisFreqDist)
+def get_classifier(num_samples=200000,redis=False,train=False):
+    if redis is True:
+        if train is True:
+            label_freqdist,feature_freqdist,feature_values = train_classifier(num_samples,True)
+        else:
+            label_freqdist = RedisFreqDist()
+            feature_freqdist = defaultdict(RedisFreqDist)
+            feature_values = defaultdict(set)
+    else:
+        label_freqdist,feature_freqdist,feature_values = train_classifier(num_samples,False)
     label_probdist = ELEProbDist(label_freqdist)
     feature_probdist = {}
     for ((label, fname), freqdist) in feature_freqdist.items():
@@ -173,7 +182,7 @@ def test(train_samples=200000,test_samples=200000):
     nltk_testing_dict = []
     accurate_samples = 0
     print "Building Classifier with %s Training Samples" % train_samples
-    classifier = get_classifier(train_samples)
+    classifier = get_classifier(train_samples,redis=False)
     print "Preparing %s Testing Samples" % test_samples
     samples = get_samples(test_samples)
     for sample in samples:
@@ -200,13 +209,14 @@ def test(train_samples=200000,test_samples=200000):
         print ("------------------------------------------------------------------------------------------------------------------------------------------")
         if result[0] == True:
             accurate_samples += 1
-        total_accuracy = (accurate_samples * 100.00 / train_samples) * 100
+        total_accuracy = (accurate_samples * 100.00 / train_samples)
     classifier.show_most_informative_features(30)
     print("\n\rManual classifier accuracy result: %s%%" % total_accuracy)
     print('\n\rNLTK classifier accuracy result: %.2f%%' % nltk_accuracy)
 
 
 if __name__=="__main__":
+    #label_freqdist,feature_freqdist,feature_values = train_classifier(2,False)
+    #print feature_freqdist
     test(500,500)
-    #get_classifier(500)
 
