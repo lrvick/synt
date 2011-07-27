@@ -216,12 +216,16 @@ def test(train_samples=200000,test_samples=200000):
 
 
 if __name__=="__main__":
-    #with redis
-    #label_freqdist,feature_freqdist,feature_values = train_classifier(2,True)
-    #print feature_freqdist
     
-    #without redis
-    #label_freqdist,feature_freqdist,feature_values = train_classifier(2,False)
-    #print feature_freqdist
-
-    test(500,500)
+    #redis support is currently not working. Uncomment the following block to see brokenness
+    """
+    print 'with regular FreqDist ----------------------------'
+    label_freqdist,feature_freqdist,feature_values = train_classifier(2,False)
+    print feature_freqdist
+    
+    print 'with RedisFreqDist ----------------------------'
+    label_freqdist,feature_freqdist,feature_values = train_classifier(2,True)
+    print feature_freqdist
+    """
+    
+    #test(500,500)
