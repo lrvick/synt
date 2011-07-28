@@ -161,3 +161,8 @@ class RedisFreqDist(FreqDist):
                         return FreqDist.freq(self, sample)
                 else:
                         return 0.0
+
+if __name__=="__main__":
+
+    import doctest
+    print doctest.testmod()
