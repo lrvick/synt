@@ -164,55 +164,32 @@ class RedisFreqDist(FreqDist):
 
 if __name__=="__main__":
 
-    def run_test(redis=True):
+    def run_test(use_redis=True):
+        #r = Redis()
+        #r.flushdb()
+
         from collections import defaultdict
         from nltk.probability import FreqDist
-        if redis == False:
-            label_freqdist = FreqDist()
+
+        if use_redis == False:
             feature_freqdist = defaultdict(FreqDist)
         else:
-            label_freqdist = RedisFreqDist()
             feature_freqdist = defaultdict(RedisFreqDist)
-     
-        labeled_featuresets = [
-            ({'neg_word1': True, 'neg_word2': True, 'neg_word3': True}, u'negative'),
-            ({'neg_word4': True, 'neg_word5': True, 'neg_word6': True}, u'negative'),
-            ({'neg_word1': True, 'neg_word2': True, 'neg_word3': True}, u'negative'),
-            ({'neg_word4': True, 'neg_word5': True, 'neg_word6': True}, u'negative'),
-            ({'pos_word1': True, 'pos_word2': True, 'pos_word3': True}, u'positive'),
-            ({'pos_word4': True, 'pos_word5': True, 'pos_word6': True}, u'positive'),
-            ({'pos_word1': True, 'pos_word2': True, 'pos_word3': True}, u'positive'),
-            ({'pos_word4': True, 'pos_word5': True, 'pos_word6': True}, u'positive'),
-        ]
-        feature_values = defaultdict(set)
-        fnames = set()
 
-        for featureset, label in labeled_featuresets:
-            label_freqdist.inc(label) 
-            for fname, fval in featureset.items():
-                feature_freqdist[label, fname].inc(fval) 
-                feature_values[fname].add(fval) 
-                fnames.add(fname)
-        for label in label_freqdist:
-            num_samples = label_freqdist[label]
-            for fname in fnames:
-                count = feature_freqdist[label, fname].N()
-                feature_freqdist[label, fname].inc(None, num_samples-count)
-                feature_values[fname].add(None)
-
-        return label_freqdist,feature_freqdist,feature_values
+        feature_freqdist['negative', 'neg_word1'].inc(1) 
+        feature_freqdist['negative', 'neg_word1'].inc(1) 
+        feature_freqdist['negative', 'neg_word2'].inc(1) 
+        feature_freqdist['positive', 'pos_word1'].inc(1) 
+        feature_freqdist['positive', 'pos_word1'].inc(1) 
+        feature_freqdist['positive', 'pos_word2'].inc(1) 
+       
+        return feature_freqdist
     
     import doctest
     print doctest.testmod()
     
-    print '\n\n-------Without Redis-------\n'    
-    label_freqdist,feature_freqdist,feature_values = run_test(False)
-    print '%s \n' % label_freqdist
-    print '%s \n' % feature_values
-    print '%s \n' % feature_freqdist
+    print '\n-------Without Redis-------\n'    
+    print '%s \n' % run_test(False)
    
-    print '\n\n-------With Redis----------\n' 
-    label_freqdist,feature_freqdist,feature_values = run_test(True)
-    print '%s \n' % label_freqdist
-    print '%s \n' % feature_values
-    print '%s \n' % feature_freqdist
+    print '\n-------With Redis----------\n' 
+    print '%s \n' % run_test(True)
