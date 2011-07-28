@@ -62,21 +62,21 @@ class RedisFreqDist(FreqDist):
         
         def __getitem__(self, sample):
                 assert sample != self.sampleskey
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 count = self.r.get(sample)
                 if count: return int(count)
                 else: return None
         
         def __setitem__(self, sample, count):
                 assert sample != self.sampleskey
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 self.r.set(sample, count)
                 self.r.sadd(self.sampleskey, sample)
                 self._invalidate()
         
         def __delitem__(self, sample):
                 assert sample != self.sampleskey
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 self.r.srem(self.sampleskey, sample)
                 self.r.delete(sample)
                 self._invalidate()
@@ -91,7 +91,7 @@ class RedisFreqDist(FreqDist):
                 return self._len_cache
         
         def clear(self):
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 
                 for sample in self.samples():
                         self.r.delete(sample)
@@ -100,7 +100,7 @@ class RedisFreqDist(FreqDist):
                 self._invalidate()
         
         def keys(self):
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 
                 if self.r.exists(self.sampleskey):
                         return self.r.sort(self.sampleskey, by='*', desc=True)
@@ -131,7 +131,7 @@ class RedisFreqDist(FreqDist):
                 self._max_cache = None
         
         def samples(self):
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 
                 if self.r.exists(self.sampleskey):
                         return self.r.sort(self.sampleskey, alpha=True)
@@ -145,7 +145,7 @@ class RedisFreqDist(FreqDist):
         
         def inc(self, sample, count=1):
                 assert sample != self.sampleskey
-                self.r.select(self.r.db)
+                #self.r.select(self.r.db)
                 self.r.sadd(self.sampleskey, sample)
                 
                 if count > 0:
