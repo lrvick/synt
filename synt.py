@@ -2,14 +2,12 @@ import os
 import re
 import sqlite3
 import nltk
-import redis
-from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
 from nltk.probability import DictionaryProbDist, ELEProbDist, FreqDist
 from nltk.tokenize.treebank import TreebankWordTokenizer
+from collections import defaultdict
 from BeautifulSoup import BeautifulStoneSoup
-from utils import RedisFreqDist
 
 db_file = 'sample_data.db'
 
@@ -120,44 +118,24 @@ def get_tokens(num_samples=None):
         all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
-def train_classifier(num_samples=200000,use_redis=False):
-    if use_redis is True:
-        label_freqdist = RedisFreqDist()
-        feature_freqdist = defaultdict(RedisFreqDist)
-        r = redis.Redis()
-        r.flushdb()
-    else:
-        label_freqdist = FreqDist()
-        feature_freqdist = defaultdict(FreqDist)
+def get_classifier(num_samples=200000):
     labeled_featuresets = get_tokens(num_samples)
+    label_freqdist = FreqDist()
+    feature_freqdist = defaultdict(FreqDist)
     feature_values = defaultdict(set)
     fnames = set()
-    count = len(labeled_featuresets)
-    for featureset, label in labeled_featuresets:
-        count -= 1
-        label_freqdist.inc(label) 
-        for fname, fval in featureset.items():
-            feature_freqdist[label, fname].inc(fval) 
-            feature_values[fname].add(fval) 
-            fnames.add(fname)
+    for featureset, label in labeled_featuresets: 
+              label_freqdist.inc(label) 
+              for fname, fval in featureset.items(): 
+                  feature_freqdist[label, fname].inc(fval) 
+                  feature_values[fname].add(fval) 
+                  fnames.add(fname)
     for label in label_freqdist:
         num_samples = label_freqdist[label]
         for fname in fnames:
             count = feature_freqdist[label, fname].N()
             feature_freqdist[label, fname].inc(None, num_samples-count)
             feature_values[fname].add(None)
-    return label_freqdist,feature_freqdist,feature_values
-
-def get_classifier(num_samples=200000,use_redis=False,train=False):
-    if use_redis is True:
-        if train is True:
-            label_freqdist,feature_freqdist,feature_values = train_classifier(num_samples,True)
-        else:
-            label_freqdist = RedisFreqDist()
-            feature_freqdist = defaultdict(RedisFreqDist)
-            feature_values = defaultdict(set)
-    else:
-        label_freqdist,feature_freqdist,feature_values = train_classifier(num_samples,False)
     label_probdist = ELEProbDist(label_freqdist)
     feature_probdist = {}
     for ((label, fname), freqdist) in feature_freqdist.items():
@@ -165,6 +143,7 @@ def get_classifier(num_samples=200000,use_redis=False,train=False):
         feature_probdist[label,fname] = probdist
     classifier = NaiveBayesClassifier(label_probdist,feature_probdist)
     return classifier
+
 
 def guess(text, classifier=None):
     if not classifier:
@@ -182,7 +161,7 @@ def test(train_samples=200000,test_samples=200000):
     nltk_testing_dict = []
     accurate_samples = 0
     print "Building Classifier with %s Training Samples" % train_samples
-    classifier = get_classifier(train_samples,use_redis=False)
+    classifier = get_classifier(train_samples)
     print "Preparing %s Testing Samples" % test_samples
     samples = get_samples(test_samples)
     for sample in samples:
@@ -209,23 +188,13 @@ def test(train_samples=200000,test_samples=200000):
         print ("------------------------------------------------------------------------------------------------------------------------------------------")
         if result[0] == True:
             accurate_samples += 1
-        total_accuracy = (accurate_samples * 100.00 / train_samples)
+        total_accuracy = (accurate_samples * 100.00 / train_samples) * 100
     classifier.show_most_informative_features(30)
     print("\n\rManual classifier accuracy result: %s%%" % total_accuracy)
     print('\n\rNLTK classifier accuracy result: %.2f%%' % nltk_accuracy)
 
 
 if __name__=="__main__":
-    
-    #redis support is currently not working. Uncomment the following block to see brokenness
-    """
-    print 'with regular FreqDist ----------------------------'
-    label_freqdist,feature_freqdist,feature_values = train_classifier(2,False)
-    print feature_freqdist
-    
-    print 'with RedisFreqDist ----------------------------'
-    label_freqdist,feature_freqdist,feature_values = train_classifier(2,True)
-    print feature_freqdist
-    """
-    
-    #test(500,500)
+    test(50000,500)
+    #get_classifier(500)
+
