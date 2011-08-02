@@ -2,6 +2,7 @@ import os
 import re
 import sqlite3
 import nltk
+from redis import Redis
 from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
 from nltk.probability import DictionaryProbDist, ELEProbDist, FreqDist
@@ -118,6 +119,25 @@ def get_tokens(num_samples=None):
         all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
+def train(num_samples=500):
+    r = Redis()
+    r.flushdb()
+    labels = ['negative','positive'] 
+    labeled_featuresets = get_tokens(num_samples)
+    feature_freqdist = defaultdict(FreqDist)
+    fnames = set()
+    for featureset, label in labeled_featuresets:
+        for fname, fval in featureset.items(): 
+            feature_freqdist[label, fname].inc(fval) 
+            fnames.add(fname)
+    for label in labels:
+        for fname in fnames:
+            count = feature_freqdist[label, fname].N()
+            if count > 0:
+                print label,fname,count
+                r.zadd(label, fname, count)
+
+
 def get_classifier(num_samples=200000):
     labeled_featuresets = get_tokens(num_samples)
     label_freqdist = FreqDist()
@@ -195,6 +215,7 @@ def test(train_samples=200000,test_samples=200000):
 
 
 if __name__=="__main__":
-    test(50000,500)
+    #test(50000,500)
+    train(50000)
     #get_classifier(500)
 
