@@ -88,28 +88,30 @@ def get_training_limit():
     return limit
 
 
-def get_samples(limit=None, only_type=None):
+def get_samples(limit=None, only_type=None,offset=None):
     db = db_init()
     cursor = db.cursor()
     pos_samples = []
     neg_samples = []
+    if not offset:
+        offset = 0
     if not limit:
         limit = get_training_limit()
     elif limit and not only_type:
         limit = (int(limit) / 2)
     if not only_type == 'negative':
-        cursor.execute("SELECT text, sentiment FROM item where sentiment = 'positive' LIMIT ?", [limit])
+        cursor.execute("SELECT text, sentiment FROM item where sentiment = 'positive' LIMIT ? OFFSET ?", [limit,offset])
         neg_samples = cursor.fetchall()
     if not only_type == 'positive':
-        cursor.execute("SELECT text, sentiment FROM item where sentiment = 'negative' LIMIT ?", [limit])
+        cursor.execute("SELECT text, sentiment FROM item where sentiment = 'negative' LIMIT ? OFFSET ?", [limit,offset])
         pos_samples = cursor.fetchall()
     samples = pos_samples + neg_samples
     return samples
 
 
-def get_tokens(num_samples=None):
+def get_tokens(num_samples=None,offset=None):
     all_tokens = []
-    samples = get_samples(num_samples)
+    samples = get_samples(num_samples,None,offset)
     for text,sentiment in samples:
         tokens = sanitize_text(text)
         try:
@@ -119,23 +121,36 @@ def get_tokens(num_samples=None):
         all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
     return all_tokens
 
+
+
 def train(num_samples=500):
     r = Redis()
     r.flushdb()
     labels = ['negative','positive'] 
-    labeled_featuresets = get_tokens(num_samples)
-    feature_freqdist = defaultdict(FreqDist)
-    fnames = set()
-    for featureset, label in labeled_featuresets:
-        for fname, fval in featureset.items(): 
-            feature_freqdist[label, fname].inc(fval) 
-            fnames.add(fname)
-    for label in labels:
-        for fname in fnames:
-            count = feature_freqdist[label, fname].N()
-            if count > 0:
-                print label,fname,count
-                r.zadd(label, fname, count)
+    samples_left = num_samples
+    offset = 0
+    while samples_left > 0:
+        if samples_left > 1000:
+            samples_set = 1000
+            samples_left -= 1000
+            offset = num_samples - samples_left
+        else:
+            samples_set = samples_left
+            samples_left = 0
+        print samples_left,num_samples
+        labeled_featuresets = get_tokens(samples_set,offset)
+        feature_freqdist = defaultdict(FreqDist)
+        fnames = set()
+        for featureset, label in labeled_featuresets:
+            for fname, fval in featureset.items(): 
+                feature_freqdist[label, fname].inc(fval) 
+                fnames.add(fname)
+        for label in labels:
+            for fname in fnames:
+                count = feature_freqdist[label, fname].N()
+                if count > 0:
+                    r.zadd(label, fname, count)
+                    print label,fname,count
 
 
 def get_classifier(num_samples=200000):
@@ -216,6 +231,6 @@ def test(train_samples=200000,test_samples=200000):
 
 if __name__=="__main__":
     #test(50000,500)
-    train(50000)
+    train(2000000)
     #get_classifier(500)
 
