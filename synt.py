@@ -163,7 +163,9 @@ def train(num_samples=500):
             for fname in fnames:
                 count = feature_freqdist[label, fname].N()
                 if count > 0:
-                    r.zadd(label, fname, count)
+                    prev_score = r.zscore(label, fname)
+                    r.zadd(label, fname, count if not prev_score else count + prev_score)
+                    print 'After zadd'
                     print label,fname,count
 
 
