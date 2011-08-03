@@ -41,11 +41,15 @@ def db_init():
 
 
 def sanitize_text(text):
-    if not text:
-        return False
-    for string in ignore_strings:
-        if string in text:
-            return False
+    """
+    Formats text to strip unneccesary verbage then returns a bag of words of text.
+    """
+    
+    if not text: return
+
+    for s in ignore_strings:
+        if s in text: return 
+
     formatted_text = re.sub("http:\/\/.*/", '', text)
     formatted_text = re.sub("@[A-Za-z0-9_]+", '', formatted_text)
     formatted_text = re.sub("#[A-Za-z0-9_]+", '', formatted_text)
@@ -54,22 +58,25 @@ def sanitize_text(text):
     formatted_text = re.sub('(\w)\\1{2,}','\\1\\1', formatted_text) #remove occurence of more than two consecutive repeating chars
     formatted_text = str(BeautifulStoneSoup(formatted_text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
     formatted_text = ''.join([c for c in formatted_text.lower() if re.match("[a-z\ \n\t]", c)])
+    
     if formatted_text:
         for emoticon in emoticons:
             try:
                 formatted_text = formatted_text.encode('ascii')
                 formatted_text = formatted_text.replace(emoticon, '')
             except:
-                return False
+                return
+        
         tokens = gen_bow(formatted_text)
         return tokens
-    else:
-        return False
 
 def gen_bow(text):
-    """ Generate bag of words."""
+    """
+    Generate bag of words for words that are greater than 1 in length.
+    """
+
     tokenizer = TreebankWordTokenizer()
-    tokens = set(x.lower() for x in tokenizer.tokenize(text)) - set(stopwords.words('english')) - set('')
+    tokens = set(x.lower() for x in tokenizer.tokenize(text) if len(x) > 1) - set(stopwords.words('english'))
     bag_of_words = dict([(token, True) for token in tokens])
     return bag_of_words
 
@@ -89,6 +96,10 @@ def get_training_limit():
 
 
 def get_samples(limit=None, only_type=None,offset=None):
+    """
+    Returns a combined list of negative and positive samples.
+    """
+    
     db = db_init()
     cursor = db.cursor()
     pos_samples = []
@@ -110,22 +121,25 @@ def get_samples(limit=None, only_type=None,offset=None):
 
 
 def get_tokens(num_samples=None,offset=None):
+    
     all_tokens = []
     samples = get_samples(num_samples,None,offset)
     for text,sentiment in samples:
         tokens = sanitize_text(text)
-        try:
-            cleaned_words = set(w.lower() for w in tokens) - set(stopwords.words('english')) - set('')
-        except Exception,e:
-            print 'Unable to format string %s' % str(sample)
-        all_tokens.append((dict([(token, True) for token in cleaned_words]), sentiment))
+        all_tokens.append((dict([(token, True) for token in tokens]), sentiment))
     return all_tokens
 
 
 
 def train(num_samples=500):
+    """
+    Mimicks the train method of the NaiveBayesClassiffier but stores it to a 
+    peristent Redis datastore.
+    """
+
     r = Redis()
     r.flushdb()
+   
     labels = ['negative','positive'] 
     samples_left = num_samples
     offset = 0
