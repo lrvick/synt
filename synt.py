@@ -95,78 +95,78 @@ def get_training_limit():
     return limit
 
 
-def get_samples(limit=None, only_type=None,offset=None):
+def get_samples(limit=get_training_limit(), offset=0):
     """
     Returns a combined list of negative and positive samples.
     """
     
     db = db_init()
     cursor = db.cursor()
-    pos_samples = []
-    neg_samples = []
-    if not offset:
-        offset = 0
-    if not limit:
-        limit = get_training_limit()
-    elif limit and not only_type:
-        limit = (int(limit) / 2)
-    if not only_type == 'negative':
-        cursor.execute("SELECT text, sentiment FROM item where sentiment = 'positive' LIMIT ? OFFSET ?", [limit,offset])
-        neg_samples = cursor.fetchall()
-    if not only_type == 'positive':
-        cursor.execute("SELECT text, sentiment FROM item where sentiment = 'negative' LIMIT ? OFFSET ?", [limit,offset])
-        pos_samples = cursor.fetchall()
-    samples = pos_samples + neg_samples
-    return samples
+    
+    limit = limit / 2  
+    offset = offset / 2
+
+    cursor.execute("SELECT text, sentiment FROM item WHERE sentiment = 'negative' LIMIT ? OFFSET ?", [limit,offset])
+    neg_samples = cursor.fetchall()
+    
+    cursor.execute("SELECT text, sentiment FROM item WHERE sentiment = 'positive' LIMIT ? OFFSET ?", [limit,offset])
+    pos_samples = cursor.fetchall()
+
+    return pos_samples + neg_samples
 
 
 def get_tokens(num_samples=None,offset=None):
-    
+    """
+    Returns a list of sanitized tokens and sentiment.
+    """
+
     all_tokens = []
-    samples = get_samples(num_samples,None,offset)
+    samples = get_samples(num_samples, offset)
     for text,sentiment in samples:
         tokens = sanitize_text(text)
-        all_tokens.append((dict([(token, True) for token in tokens]), sentiment))
+        if tokens:
+            all_tokens.append((dict([(token, True) for token in tokens]), sentiment))
     return all_tokens
 
 
 
-def train(num_samples=500):
+def train(num_samples=500, stepby=1000):
     """
-    Mimicks the train method of the NaiveBayesClassiffier but stores it to a 
-    peristent Redis datastore.
+    Mimicks the train method of the NaiveBayesClassiffier but
+    stores it to a peristent Redis datastore.
     """
 
     r = Redis()
     r.flushdb()
-   
+    print("Flushed Redis DB")
+
     labels = ['negative','positive'] 
     samples_left = num_samples
     offset = 0
     while samples_left > 0:
-        if samples_left > 1000:
-            samples_set = 1000
-            samples_left -= 1000
+        if samples_left > stepby:
+            samples_set = stepby
+            samples_left -= stepby
             offset = num_samples - samples_left
         else:
             samples_set = samples_left
             samples_left = 0
         print samples_left,num_samples
         labeled_featuresets = get_tokens(samples_set,offset)
-        feature_freqdist = defaultdict(FreqDist)
-        fnames = set()
-        for featureset, label in labeled_featuresets:
-            for fname, fval in featureset.items(): 
-                feature_freqdist[label, fname].inc(fval) 
-                fnames.add(fname)
-        for label in labels:
-            for fname in fnames:
-                count = feature_freqdist[label, fname].N()
-                if count > 0:
-                    prev_score = r.zscore(label, fname)
-                    r.zadd(label, fname, count if not prev_score else count + prev_score)
-                    print 'After zadd'
-                    print label,fname,count
+        if labeled_featuresets:
+            feature_freqdist = defaultdict(FreqDist)
+            fnames = set()
+            for featureset, label in labeled_featuresets:
+                for fname, fval in featureset.items(): 
+                    feature_freqdist[label, fname].inc(fval) 
+                    fnames.add(fname)
+            for label in labels:
+                for fname in fnames:
+                    count = feature_freqdist[label, fname].N()
+                    if count > 0:
+                        prev_score = r.zscore(label, fname)
+                        r.zadd(label, fname, count if not prev_score else count + prev_score)
+                        print "Label: %s | Fname: %s | Count: %s" %(label,fname,count)
 
 
 def get_classifier(num_samples=200000):
@@ -247,6 +247,6 @@ def test(train_samples=200000,test_samples=200000):
 
 if __name__=="__main__":
     #test(50000,500)
-    train(2000000)
+    train(2000000, stepby=10000)
     #get_classifier(500)
 
