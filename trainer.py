@@ -3,83 +3,12 @@ import re
 import sqlite3
 import nltk
 from redis import Redis
-from nltk.corpus import stopwords
 from nltk.classify import NaiveBayesClassifier
 from nltk.probability import DictionaryProbDist, ELEProbDist, FreqDist
 from nltk.tokenize.treebank import TreebankWordTokenizer
 from collections import defaultdict
-from BeautifulSoup import BeautifulStoneSoup
-
-db_file = 'sample_data.db'
-
-emoticons = [
-    ':-L', ':L', '<3', '8)', '8-)', '8-}', '8]', '8-]', '8-|', '8(', '8-(',
-    '8-[', '8-{', '-.-', 'xx', '</3', ':-{', ': )', ': (', ';]', ':{', '={',
-    ':-}', ':}', '=}', ':)', ';)', ':/', '=/', ';/', 'x(', 'x)', ':D', 'T_T',
-    'O.o', 'o.o', 'o_O', 'o.-', 'O.-', '-.o', '-.O', 'X_X', 'x_x', 'XD', 'DX',
-    ':-$', ':|', '-_-', 'D:', ':-)', '^_^', '=)', '=]', '=|', '=[', '=(', ':(',
-    ':-(', ':, (', ':\'(', ':-]', ':-[', ':]', ':[', '>.>', '<.<'
-]
-
-ignore_strings = ['RT', ':-P', ':-p', ';-P', ';-p', ':P', ':p', ';P', ';p']
-
-try:
-    stopwords.words('english')
-except Exception, e:
-    print e
-    nltk.download('stopwords')
-
-
-def db_init():
-    if not os.path.exists(db_file):
-        conn = sqlite3.connect(db_file)
-        cursor = conn.cursor()
-        cursor.execute('''create table item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
-    else:
-        conn = sqlite3.connect(db_file)
-    return conn
-
-
-def sanitize_text(text):
-    """
-    Formats text to strip unneccesary verbage then returns a bag of words of text.
-    """
-    
-    if not text: return
-
-    for s in ignore_strings:
-        if s in text: return 
-
-    formatted_text = re.sub("http:\/\/.*/", '', text)
-    formatted_text = re.sub("@[A-Za-z0-9_]+", '', formatted_text)
-    formatted_text = re.sub("#[A-Za-z0-9_]+", '', formatted_text)
-    formatted_text = re.sub("^\s+", '', formatted_text)
-    formatted_text = re.sub("\s+", ' ', formatted_text)
-    formatted_text = re.sub('(\w)\\1{2,}','\\1\\1', formatted_text) #remove occurence of more than two consecutive repeating chars
-    formatted_text = str(BeautifulStoneSoup(formatted_text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
-    formatted_text = ''.join([c for c in formatted_text.lower() if re.match("[a-z\ \n\t]", c)])
-    
-    if formatted_text:
-        for emoticon in emoticons:
-            try:
-                formatted_text = formatted_text.encode('ascii')
-                formatted_text = formatted_text.replace(emoticon, '')
-            except:
-                return
-        
-        tokens = gen_bow(formatted_text)
-        return tokens
-
-def gen_bow(text):
-    """
-    Generate bag of words for words that are greater than 1 in length.
-    """
-
-    tokenizer = TreebankWordTokenizer()
-    tokens = set(x.lower() for x in tokenizer.tokenize(text) if len(x) > 1) - set(stopwords.words('english'))
-    bag_of_words = dict([(token, True) for token in tokens])
-    return bag_of_words
-
+from utils import top_tokens, bag_of_words, sanitize_text, db_init
+import settings
 
 def get_training_limit():
     db = db_init()
@@ -102,20 +31,35 @@ def get_samples(limit=get_training_limit(), offset=0):
     
     db = db_init()
     cursor = db.cursor()
+   
+    sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ?"
+    sql_with_offset = "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ? OFFSET ?"
     
+    
+    if limit < 2: limit = 2
     limit = limit / 2  
-    offset = offset / 2
-
-    cursor.execute("SELECT text, sentiment FROM item WHERE sentiment = 'negative' LIMIT ? OFFSET ?", [limit,offset])
-    neg_samples = cursor.fetchall()
     
-    cursor.execute("SELECT text, sentiment FROM item WHERE sentiment = 'positive' LIMIT ? OFFSET ?", [limit,offset])
-    pos_samples = cursor.fetchall()
+    if offset > 0: 
+
+        cursor.execute(sql_with_offset, ["negative", limit,offset])
+        neg_samples = cursor.fetchall()
+    
+        cursor.execute(sql_with_offset, ["positive", limit,offset])
+        pos_samples = cursor.fetchall()
+
+    else:
+ 
+        cursor.execute(sql, ["negative", limit,])
+        neg_samples = cursor.fetchall()
+        
+        cursor.execute(sql, ["positive", limit,])
+        pos_samples = cursor.fetchall()
+       
 
     return pos_samples + neg_samples
 
 
-def get_tokens(num_samples=None,offset=None):
+def get_tokens(num_samples, offset=0):
     """
     Returns a list of sanitized tokens and sentiment.
     """
@@ -188,18 +132,62 @@ def get_classifier(num_samples=200000):
             feature_freqdist[label, fname].inc(None, num_samples-count)
             feature_values[fname].add(None)
     label_probdist = ELEProbDist(label_freqdist)
+    print label_probdist
     feature_probdist = {}
     for ((label, fname), freqdist) in feature_freqdist.items():
         probdist = ELEProbDist(freqdist, bins=len(feature_values[fname]))
         feature_probdist[label,fname] = probdist
-    classifier = NaiveBayesClassifier(label_probdist,feature_probdist)
-    return classifier
+    
+    print probdist,feature_probdist
+    #classifier = NaiveBayesClassifier(label_probdist,feature_probdist)
+    #return classifier
+
+def get_classifier_redis(num_samples=200000):
+    """
+    Builds a classifier from Redis.
+    """
+    
+    label_freqdist = FreqDist()
+    feature_freqdist = defaultdict(FreqDist)
+    
+    top_neg_features = top_tokens('negative', end=num_samples)
+    top_pos_features = top_tokens('positive', end=num_samples)
+
+    label_freqdist.inc('positive')
+    label_freqdist.inc('negative')
+
+    for pos_items,neg_items in zip(top_pos_features,top_neg_features):
+        feature_freqdist[('positive', pos_items[0])].inc(None, count=pos_items[1])
+        feature_freqdist[('negative', neg_items[0])].inc(None, count=neg_items[1])
+
+
+    label_probdist = ELEProbDist(label_freqdist)
+    print label_probdist
+    feature_probdist = {}
+    for ((label, fname), freqdist) in feature_freqdist.items():
+        probdist = ELEProbDist(freqdist)
+        feature_probdist[label,fname] = probdist
+
+    print probdist, feature_probdist
+
+
+    #classifier = NaiveBayesClassifier(label_probdist, feature_probdist)
+    #return classifier
+
+
+def get_probdist(label_freqdist, feature_freqdist, feature_values):
+    
+    label_probdist = ELEProbDist(label_freqdist)
+    feature_probdist = {}
+    for ((label, fname), freqdist) in feature_freqdist.items():
+        probdist = ELEProbDist(freqdist)
+        feature_probdist[label,fname] = probdist
 
 
 def guess(text, classifier=None):
     if not classifier:
         classifier = get_classifier()
-    bag_of_words = gen_bow(text)
+    bag_of_words = bag_of_words(text)
     guess = classifier.classify(bag_of_words)
     prob = classifier.prob_classify(bag_of_words)
 
@@ -246,7 +234,10 @@ def test(train_samples=200000,test_samples=200000):
 
 
 if __name__=="__main__":
-    #test(50000,500)
-    train(2000000, stepby=10000)
-    #get_classifier(500)
-
+    test(50000,500)
+    #train(2000000, stepby=10000)
+    #print 'REDIS'
+    #get_classifier_redis(5)
+    #print '-'*100
+    #print 'NORMAL'
+    #get_classifier(5)
