@@ -12,12 +12,13 @@ except IOError: #no such file
 
 
 def db_init():
+    """Initializes the sqlite3 database."""
     import sqlite3 
 
     if not os.path.exists(settings.DB_FILE):
         conn = sqlite3.connect(settings.DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('''create table item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
+        cursor.execute('''CREATE TABLE item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
     else:
         conn = sqlite3.connect(settings.DB_FILE)
     return conn
@@ -29,29 +30,39 @@ def sanitize_text(text):
     """
     
     if not text: return
+    
+    text = text.lower()
 
     for s in settings.IGNORE_STRINGS:
         if s in text: return 
 
+
+    format_pats = (
+        #match, replace with
+        ("http:\/\/.*/", ''),
+        ("@[A-Za-z0-9_]+", ''),
+        ("#[A-Za-z0-9_]+", ''),
+        ("^\s+", ''),
+        ("\s+", ' '),
+        ("(\w)\\1{2,}','\\1\\1") #remove occurences of more than two consecutive repeating characters 
+    )
+
+    for pat in format_pats:
+        re.sub(p[0], p[1], text)
+
+    #convert html entities
+    stripped_text = str(BeautifulStoneSoup(text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
+    sanitized_text = ''.join([c for c in stripped_text if re.match("[a-z\ \n\t]", c)])
     
-    formatted_text = re.sub("http:\/\/.*/", '', text)
-    formatted_text = re.sub("@[A-Za-z0-9_]+", '', formatted_text)
-    formatted_text = re.sub("#[A-Za-z0-9_]+", '', formatted_text)
-    formatted_text = re.sub("^\s+", '', formatted_text)
-    formatted_text = re.sub("\s+", ' ', formatted_text)
-    formatted_text = re.sub('(\w)\\1{2,}','\\1\\1', formatted_text) #remove occurence of more than two consecutive repeating chars
-    formatted_text = str(BeautifulStoneSoup(formatted_text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
-    formatted_text = ''.join([c for c in formatted_text.lower() if re.match("[a-z\ \n\t]", c)])
-    
-    if formatted_text:
+    if sanitized_text:
         for emoticon in settings.EMOTICONS:
             try:
-                formatted_text = formatted_text.encode('ascii')
-                formatted_text = formatted_text.replace(emoticon, '')
+                sanitized_text = sanitized_text.encode('ascii')
+                sanitized_text = sanitized_text.replace(emoticon, '')
             except:
                 return
         
-        tokens = bag_of_words(formatted_text)
+        tokens = bag_of_words(sanitized_text)
         return tokens
 
 
