@@ -233,6 +233,15 @@ def test(train_samples=200000,test_samples=200000):
     print('\n\rNLTK classifier accuracy result: %.2f%%' % nltk_accuracy)
 
 
+def collect_samples():
+    neg_lastid = None
+    pos_lastid = None
+    while True:
+        time.sleep(1)
+        pos_lastid = twitter_feed('positive',pos_lastid)
+        neg_lastid = twitter_feed('negative',neg_lastid)
+
+
 if __name__=="__main__":
     test(50000,500)
     #train(2000000, stepby=10000)
