@@ -1,3 +1,8 @@
+try:
+    stopwords.words('english')
+except IOError: #no such file
+    nltk.download('stopwords')
+
 def guess(text, classifier=None):
     if not classifier:
         classifier = get_classifier()
