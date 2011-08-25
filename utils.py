@@ -1,11 +1,36 @@
 import re
 import redis
+import string
 import settings
-from ntlk.corpus import stopwords
-from BeautifulSoup import BeautifulStoneSoup
+from nltk.corpus import stopwords
+from nltk.collocations import BigramCollocationFinder
+from nltk.metrics import BigramAssocMeasures
+from nltk.tokenize import WhitespaceTokenizer
+from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
+import itertools
+import cPickle as pickle
+
+def word_feats(words):
+    """Basic word features, simple bag of words model"""
+
+    return dict([(word, True) for word in words])
+
+def stopword_word_feats(words):
+    """Word features with filtered stopwords"""
+
+    stopset = set(stopwords.words('english'))
+    return dict([(word,True) for word in words if word not in stopset])
+
+def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
+    """Word features with bigrams"""
+
+    bigram_finder = BigramCollocationFinder.from_words(words)
+    bigrams = bigram_finder.nbest(score_fn, n)
+    return dict([(ngram, True) for ngram in itertools.chain(words, bigrams)])
 
 def db_init():
     """Initializes the sqlite3 database."""
+    
     import sqlite3 
 
     if not os.path.exists(settings.DB_FILE):
@@ -19,58 +44,45 @@ def db_init():
 
 def sanitize_text(text):
     """
-    Formats text to strip unneccesary verbage then returns a bag of words of text.
+    Formats text to strip unneccesary:words, punctuation and whitespace. Returns a tokenized set.
     """
     
-    if not text: return
-    
+    if not text: return 
+   
     text = text.lower()
 
-    for s in settings.IGNORE_STRINGS:
-        if s in text: return 
+    for e in settings.EMOTICONS:
+        text = text.replace(e, '') #remove emoticons
 
+    try:
+        text = str(''.join(BeautifulSoup(text).findAll(text=True))) #strip html and force str
+    except Exception, e:
+        print 'Exception occured:', e
+        return
 
     format_pats = (
         #match, replace with
-        ("http:\/\/.*/", ''),
-        ("@[A-Za-z0-9_]+", ''),
-        ("#[A-Za-z0-9_]+", ''),
-        ("^\s+", ''),
-        ("\s+", ' '),
-        ("(\w)\\1{2,}','\\1\\1") #remove occurences of more than two consecutive repeating characters 
+        ("http:\/\/.*/", ''), #strip links
+        ("@[A-Za-z0-9_]+", ''), #twitter specific ""
+        ("#[A-Za-z0-9_]+", ''), # ""
+        ("(\w)\\1{2,}", "\\1\\1"), #remove occurences of more than two consecutive repeating characters
     )
-
+    
     for pat in format_pats:
-        re.sub(p[0], p[1], text)
+        text = re.sub(pat[0], pat[1], text)
 
-    #convert html entities
-    stripped_text = str(BeautifulStoneSoup(text, convertEntities=BeautifulStoneSoup.HTML_ENTITIES))
-    sanitized_text = ''.join([c for c in stripped_text if re.match("[a-z\ \n\t]", c)])
+    text = text.translate(string.maketrans('', ''), string.punctuation).strip() #strip punctuation
+
+    if text:
+        words = [w for w in WhitespaceTokenizer().tokenize(text) if len(w) > 1]
     
-    if sanitized_text:
-        for emoticon in settings.EMOTICONS:
-            try:
-                sanitized_text = sanitized_text.encode('ascii')
-                sanitized_text = sanitized_text.replace(emoticon, '')
-            except:
-                return
-        
-        tokens = bag_of_words(sanitized_text)
-        return tokens
-
-
-def bag_of_words(text):
-    """
-    Generate bag of words fo that are greater than 1 in length.
-    """
-
-    tokens = [w.lower() for w in TreebankWordTokenizer().tokenize(text) if len(w) > 1]
-    tokens = set(tokens) - set(stopwords.words('english')) 
-    
-    return dict([(token, True) for token in tokens]) 
-
+        return bigram_word_feats(words)
 
 def get_sample_limit():
+    """
+    Makes sure to return an equivalent amount of negative and positive samples.
+    """
+    
     db = db_init()
     cursor = db.cursor()
     cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'positive'")
@@ -210,10 +222,40 @@ class RedisManager(object):
     def __init__(self):
         self.r = redis.Redis()
 
+    def store_word_freqdist(samples, stepby=1000):
+        """
+        Stores a word freqdist to Redis expects a list of samples in the form (text, sentiment)
+        ex. (u'This is a text string', 'neg')
+        """
+        
+        offset = 0
+        samples_left = samples
+
+        #while samples > 0:
+        #    if samples > stepby:
+        #        samples 
+
+    def store_classifier(self, classifier, name='classifier'):
+        """
+        Stores a pickled a classifier into Redis.
+        """
+        dumped = pickle.dumps(classifier, protocol=pickle.HIGHEST_PROTOCOL)
+        self.r.set(name, dumped)
+        
+
+    def load_classifier(self, name='classifier'):
+        """
+        Loads (unpickles) a classifier from Redis.
+        """
+        loaded = pickle.loads(self.r.get(name))
+        return loaded
+
+
     def top_tokens(self, label, start=0, end=10):
         """Return the most popular tokens for label from Redis store."""
-         self.r.exists(label):
+        if self.r.exists(label):
             return self.r.zrange(label, start, end, withscores=True, desc=True) 
+
 
 
 def twitter_feed(sentiment, last_id = None, **kwargs):
