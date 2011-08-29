@@ -1,11 +1,14 @@
+import os
 import re
 import redis
 import string
 import settings
+from nltk import NaiveBayesClassifier
 from nltk.corpus import stopwords
 from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
 from nltk.tokenize import WhitespaceTokenizer
+from nltk.probability import FreqDist, ConditionalFreqDist
 from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
 import itertools
 import cPickle as pickle
@@ -21,12 +24,23 @@ def stopword_word_feats(words):
     stopset = set(stopwords.words('english'))
     return dict([(word,True) for word in words if word not in stopset])
 
-def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
+def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withstopwords=True):
     """Word features with bigrams"""
-
+    if not words: return
     bigram_finder = BigramCollocationFinder.from_words(words)
     bigrams = bigram_finder.nbest(score_fn, n)
     return dict([(ngram, True) for ngram in itertools.chain(words, bigrams)])
+
+def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
+    """Best words with bigrams."""
+    if not words: return
+    bigram_finder = BigramCollocationFinder.from_words(words)
+    bigrams = bigram_finder.nbest(score_fn, n)
+    
+    d = dict([(bigram, True) for bigram in bigrams])
+    d.update(best_word_feats(words))
+    return d
+
 
 def db_init():
     """Initializes the sqlite3 database."""
@@ -42,7 +56,7 @@ def db_init():
     return conn
 
 
-def sanitize_text(text):
+def sanitize_text(text, feature_extractor=stopword_word_feats):
     """
     Formats text to strip unneccesary:words, punctuation and whitespace. Returns a tokenized set.
     """
@@ -54,15 +68,9 @@ def sanitize_text(text):
     for e in settings.EMOTICONS:
         text = text.replace(e, '') #remove emoticons
 
-    try:
-        text = str(''.join(BeautifulSoup(text).findAll(text=True))) #strip html and force str
-    except Exception, e:
-        print 'Exception occured:', e
-        return
-
     format_pats = (
         #match, replace with
-        ("http:\/\/.*/", ''), #strip links
+        ("http.*", ''), #strip links
         ("@[A-Za-z0-9_]+", ''), #twitter specific ""
         ("#[A-Za-z0-9_]+", ''), # ""
         ("(\w)\\1{2,}", "\\1\\1"), #remove occurences of more than two consecutive repeating characters
@@ -70,17 +78,28 @@ def sanitize_text(text):
     
     for pat in format_pats:
         text = re.sub(pat[0], pat[1], text)
+    
+    try:
+        text = str(''.join(BeautifulSoup(text).findAll(text=True))) #strip html and force str
+    except Exception, e:
+        print 'Exception occured:', e
+        return
+
 
     text = text.translate(string.maketrans('', ''), string.punctuation).strip() #strip punctuation
 
     if text:
         words = [w for w in WhitespaceTokenizer().tokenize(text) if len(w) > 1]
     
-        return bigram_word_feats(words)
+        return feature_extractor(words)
 
 def get_sample_limit():
     """
-    Makes sure to return an equivalent amount of negative and positive samples.
+    Returns the limit of samples so that both positive and negative samples
+    will remain balanced.
+
+    ex. if returned value is 203 we can be confident in drawing that many samples
+    from both tables.
     """
     
     db = db_init()
@@ -217,23 +236,92 @@ def get_probdist(label_freqdist, feature_freqdist, feature_values):
         feature_probdist[label,fname] = probdist
 
 
+def train_classifier(feats):
+    classifier = NaiveBayesClassifier.train(feats)
+    return classifier
+
 class RedisManager(object):
 
     def __init__(self):
         self.r = redis.Redis()
+    
+    def build_freqdists(self, n=100000):
+        """ Build word and label freq dists from the stored words with n words. """
 
-    def store_word_freqdist(samples, stepby=1000):
+        word_freqdist = FreqDist()
+        label_word_freqdist = ConditionalFreqDist()
+
+        pos_words = self.r.zrange('positive_wordcounts', 0, n, withscores=True, desc=True)
+        neg_words = self.r.zrange('negative_wordcounts', 0, n, withscores=True, desc=True)
+
+        for word,count in pos_words:
+            word_freqdist.inc(word, count=count)
+            label_word_freqdist['pos'].inc(word, count=count)
+
+        for word,count in neg_words:
+            word_freqdist.inc(word, count=count)
+            label_word_freqdist['neg'].inc(word, count=count)
+
+        return (word_freqdist, label_word_freqdist)
+
+
+    def store_wordcounts(self, samples):
         """
-        Stores a word freqdist to Redis expects a list of samples in the form (text, sentiment)
+        Stores word counts for label in Redis with the ability to increment.
+        
+        Expects a list of samples in the form (text, sentiment) 
         ex. (u'This is a text string', 'neg')
         """
-        
-        offset = 0
-        samples_left = samples
 
-        #while samples > 0:
-        #    if samples > stepby:
-        #        samples 
+        if samples:
+        
+            for text,label in samples:
+            #    tokens = sanitize_text(text)
+            #    print tokens
+            #    if tokens: 
+            #        for word in tokens:
+            #            word_freqdist.inc(word)    
+            #            label_word_freqdist[label].inc(word)
+
+                label = label + '_wordcounts'
+                tokens = sanitize_text(text)
+
+                if tokens:
+                    for word in tokens:
+                        prev_score = self.r.zscore(label, word)
+                        print 'Previous "%s" Score: %s'  % (word, prev_score)
+                   
+                        self.r.zadd(label, word, 1 if not prev_score else prev_score + 1)
+
+
+
+
+                #return word_freqdist    
+                #for fname in tokens:
+                #    
+                #    prev_score = self.r.zscore(label, fname)
+                #    print 'Previous "%s" Score: %s'  % (fname, prev_score)
+                #   
+                #    self.r.zadd(label, fname, 1 if not prev_score else prev_score + 1)
+
+
+    def store_word_scores(self, word_freqdist, label_word_freqdist):
+        word_scores = {}
+
+        pos_word_count = label_word_freqdist['pos'].N()
+        neg_word_count = label_word_freqdist['neg'].N()
+        total_word_count = pos_word_count + neg_word_count
+
+        for word, freq in word_freqdist.iteritems():
+            print (word, freq)
+            pos_score = BigramAssocMeasures.chi_sq(label_word_freqdist['pos'][word], (freq, pos_word_count), total_word_count)
+
+            neg_score = BigramAssocMeasures.chi_sq(label_word_freqdist['neg'][word], (freq, neg_word_count), total_word_count)
+
+            word_scores[word] = pos_score + neg_score
+        
+        self.r.set('word_scores', word_scores)
+
 
     def store_classifier(self, classifier, name='classifier'):
         """
@@ -243,18 +331,41 @@ class RedisManager(object):
         self.r.set(name, dumped)
         
 
-    def load_classifier(self, name='classifier'):
+    def load_classifier(self, name='classifier', feats=None, force_train=False):
         """
         Loads (unpickles) a classifier from Redis.
         """
-        loaded = pickle.loads(self.r.get(name))
-        return loaded
+        if not force_train:
+            loaded = pickle.loads(self.r.get(name))
+            return loaded 
+        else:
+            assert feats, "Requires training features to train classifier."
+            classifier = train_classifier(feats)
+            #self.store_classifier(classifier)
+            #return self.load_classifier()
+            return classifier
 
-
-    def top_tokens(self, label, start=0, end=10):
-        """Return the most popular tokens for label from Redis store."""
+    def top_words(self, label, start=0, end=10):
+        """Return the top words for label from Redis store."""
         if self.r.exists(label):
             return self.r.zrange(label, start, end, withscores=True, desc=True) 
+
+    def best_words(self, n=10000):
+        """Return n best words."""
+        import ast
+
+        word_scores = ast.literal_eval(self.r.get('word_scores')) #str -> dict
+
+        if word_scores:
+            best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
+            words = set([w for w,s in best])
+            return words
+
+
+bestwords = RedisManager().best_words()
+
+def best_word_feats(words):
+    return dict([(word, True) for word in words if word in bestwords])
 
 
 
