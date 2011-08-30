@@ -176,7 +176,7 @@ if __name__ == "__main__":
     from utils import word_feats, stopword_word_feats, bigram_word_feats,  best_bigram_word_feats
 
     print("Training ...")
-    trainv2(bigram_word_feats, num_samples=10000)
+    trainv2(bigram_word_feats, num_samples=100000)
     #print 'Word feats without stopwords'
     #test_train(word_feats)
     #print 'Word feats with stopwords'

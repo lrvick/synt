@@ -245,7 +245,7 @@ class RedisManager(object):
     def __init__(self):
         self.r = redis.Redis()
     
-    def build_freqdists(self, n=100000):
+    def build_freqdists(self, n=300000):
         """ Build word and label freq dists from the stored words with n words. """
 
         word_freqdist = FreqDist()
@@ -350,15 +350,20 @@ class RedisManager(object):
         if self.r.exists(label):
             return self.r.zrange(label, start, end, withscores=True, desc=True) 
 
-    def best_words(self, n=10000):
+    def best_words(self, n=50000):
         """Return n best words."""
         import ast
 
-        word_scores = ast.literal_eval(self.r.get('word_scores')) #str -> dict
+
+        try:
+            word_scores = ast.literal_eval(self.r.get('word_scores')) #str -> dict
+        except ValueError:
+            raise ValueError('Malformed string, make sure its a proper dictionary.')
+            
 
         if word_scores:
             best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
-            words = set([w for w,s in best])
+            words = set([w or w,s in best])
             return words
 
 
