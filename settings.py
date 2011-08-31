@@ -1,6 +1,5 @@
 # Configuration for Synt
 
-
 DB_FILE = 'sample_data.db'
 
 EMOTICONS = [
@@ -13,8 +12,3 @@ EMOTICONS = [
 ]
 
 IGNORE_STRINGS = ['RT', ':-P', ':-p', ';-P', ';-p', ':P', ':p', ';P', ';p']
-
-
-
-
-
