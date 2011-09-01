@@ -1,6 +1,9 @@
 # Configuration for Synt
+import os
 
-DB_FILE = 'sample_data.db'
+PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
+
+DB_FILE = os.path.join(PROJECT_PATH, 'sample_data.db')
 
 EMOTICONS = [
     ':-L', ':L', '<3', '8)', '8-)', '8-}', '8]', '8-]', '8-|', '8(', '8-(',

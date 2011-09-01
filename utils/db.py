@@ -1,7 +1,7 @@
 """Functions that interact with or initial the database."""
-#get settings into here
 import os
 import sqlite3
+from synt import settings
 
 def db_init():
     """Initializes the sqlite3 database."""

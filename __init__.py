@@ -1,18 +1,20 @@
-from utils.redis import RedisManager
-from utils.extractors import best_word_feats, sanitize_text
-from utils.collector import twitter_feed
+from synt.utils.redis_manager import RedisManager
+from synt.utils.extractors import best_word_feats, sanitize_text
+from synt.utils.collector import twitter_feed
 
 m = RedisManager()
-classifier = m.load_classifer()
+classifier = m.load_classifier()
 
 def guess(text, classifier=classifier):
     """Takes a blob of text and returns the sentiment and confidence score."""
 
+    assert classifier, "Needs a classifier."
+    
     bag_of_words = best_word_feats(sanitize_text(text))
-
-    guess = classifier.classify(bag_of_words)
-    prob = classifier.prob_classify(bag_of_words)
-    return guess,[(prob.prob(sample),sample) for sample in prob.samples()]
+    if bag_of_words:
+        guess = classifier.classify(bag_of_words)
+        prob = classifier.prob_classify(bag_of_words)
+        return guess,[(prob.prob(sample),sample) for sample in prob.samples()]
 
 def collect_samples():
     """Will continue populating sample database with content."""

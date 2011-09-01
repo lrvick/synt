@@ -1,14 +1,15 @@
 """Tools for extracting features and text processing."""
 
-#get settings into here
 import re
 import string
 from nltk.corpus import stopwords
 from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
 from nltk.tokenize import WhitespaceTokenizer
-from utils.redis import RedisManager
+from redis_manager import RedisManager
 from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
+
+from synt import settings
 
 bestwords = RedisManager().best_words() 
 
@@ -32,7 +33,7 @@ def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withsto
 
 def best_word_feats(words):
     """Word feats with best words."""
-    if not (words or bestwords): return
+    if not (words and bestwords): return
     return dict([(word, True) for word in words if word in bestwords])
 
 def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
