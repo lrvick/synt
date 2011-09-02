@@ -1,6 +1,8 @@
 from nltk.classify import NaiveBayesClassifier, util
 from collections import defaultdict
-from utils import RedisManager, sanitize_text, best_bigram_word_feats, get_samples
+from synt.utils,redis_manager import RedisManager
+from synt.utils.extractors import sanitize_text, best_word_feats
+from synt.utils.db import get_samples
 import nltk.metrics
 import cPickle as pickle
 import datetime
@@ -122,6 +124,5 @@ def train(feat_ex, num_samples=200000):
 #    classifier.show_most_informative_features()
 
 if __name__ == "__main__":
-    from utils import word_feats, stopword_word_feats, bigram_word_feats, best_bigram_word_feats, best_word_feats
     
     train(best_word_feats, num_samples=200000)

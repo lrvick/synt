@@ -1,4 +1,4 @@
-# Configuration for Synt
+#Settings for synt project.
 import os
 
 PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))

@@ -11,7 +11,7 @@ from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
 
 from synt import settings
 
-bestwords = RedisManager().best_words() 
+BEST_WORDS = RedisManager().best_words() 
 
 def word_feats(words):
     """Basic word features, simple bag of words model"""
@@ -33,8 +33,8 @@ def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withsto
 
 def best_word_feats(words):
     """Word feats with best words."""
-    if not (words and bestwords): return
-    return dict([(word, True) for word in words if word in bestwords])
+    if not (words and BEST_WORDS): return
+    return dict([(word, True) for word in words if word in BEST_WORDS])
 
 def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
     """Word features with bigrams and best words."""
