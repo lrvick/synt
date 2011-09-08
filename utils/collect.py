@@ -1,7 +1,13 @@
 """Tools for collecting sample data."""
 
+import simplejson as json
+import urllib2
+import sqlite3
+from synt.utils.db import db_init
+from synt.utils.text import sanitize_text
+
 def twitter_feed(sentiment, last_id=None, **kwargs):
-    db = synt.db_init()
+    db = db_init()
     cursor = db.cursor()
     if sentiment == 'positive':
         query = ':)'
