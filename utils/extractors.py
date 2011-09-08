@@ -7,10 +7,9 @@ from nltk.metrics import BigramAssocMeasures
 from synt.utils.redis_manager import RedisManager
 import synt.settings as settings
 
-try:
-    BEST_WORDS = RedisManager().get_best_words() 
-except ValueError: 
-    raise
+man = RedisManager()
+if 'word_scores' in man.r.keys():
+    BEST_WORDS = man.get_best_words()
 
 def word_feats(words):
     """Basic word features, simple bag of words model"""

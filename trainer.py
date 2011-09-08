@@ -8,7 +8,8 @@ import nltk.metrics
 import cPickle as pickle
 import datetime
 
-def train(feat_ex, train_samples=400000, force_update=False):
+def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
+    wordcount_range=150000, force_update=False):
     """
     Trains a Naive Bayes classifier with samples from database and stores it in redis.
     
@@ -21,15 +22,15 @@ def train(feat_ex, train_samples=400000, force_update=False):
         print("Trained classifier exists in Redis.")
         return
 
-    print('Storing word counts.')
-    man.store_word_counts(samples_to_use=300)
-    print('Build frequency distributions.')
-    man.build_freqdists(token_range=100)
+    print('Storing %d word counts.' % wordcount_samples)
+    man.store_word_counts(wordcount_samples)
+    print('Build frequency distributions with %d words.' % wordcount_range)
+    man.build_freqdists(wordcount_range)
     print('Storing word scores.')
     man.store_word_scores()
 
     samples = get_samples(train_samples)
-    print('Got samples')
+    
     half = train_samples / 2
 
     neg_samples = samples[half:]
@@ -45,13 +46,15 @@ def train(feat_ex, train_samples=400000, force_update=False):
         tokens = feat_ex(sanitize_text(text))
         if tokens:
             posfeats.append((tokens,sent))
+    
+    print('Build negfeats and posfeats')
 
     negcutoff = len(negfeats)*3/4 # 3/4 training set
     poscutoff = len(posfeats)*3/4 
 
     trainfeats = negfeats[:negcutoff] + posfeats[:poscutoff]
     testfeats  = negfeats[negcutoff:] + posfeats[poscutoff:]
-    print 'train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats))
+    print('Train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats)))
 
     classifier = NaiveBayesClassifier.train(trainfeats)
 
@@ -131,4 +134,4 @@ def train(feat_ex, train_samples=400000, force_update=False):
 #    classifier.show_most_informative_features()
 
 if __name__ == "__main__":
-    train(best_word_feats, train_samples=100, force_update=False)
+    train(best_word_feats, force_update=False)
