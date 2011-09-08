@@ -5,8 +5,6 @@ from synt.utils.extractors import best_word_feats
 from synt.utils.db import get_samples
 from synt.utils.text import sanitize_text
 import nltk.metrics
-import cPickle as pickle
-import datetime
 
 def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     wordcount_range=150000, force_update=False):
