@@ -8,7 +8,7 @@ import nltk.metrics
 import cPickle as pickle
 import datetime
 
-def train(feat_ext, train_samples=400000, force_update=False):
+def train(feat_ex, train_samples=400000, force_update=False):
     """
     Trains a Naive Bayes classifier with samples from database and stores it in redis.
     
@@ -22,15 +22,14 @@ def train(feat_ext, train_samples=400000, force_update=False):
         return
 
     print('Storing word counts.')
-    man.store_word_counts()
+    man.store_word_counts(samples_to_use=300)
     print('Build frequency distributions.')
-    man.build_freqdists()
+    man.build_freqdists(token_range=100)
     print('Storing word scores.')
     man.store_word_scores()
-    print('Done!')
 
     samples = get_samples(train_samples)
-
+    print('Got samples')
     half = train_samples / 2
 
     neg_samples = samples[half:]
@@ -47,9 +46,8 @@ def train(feat_ext, train_samples=400000, force_update=False):
         if tokens:
             posfeats.append((tokens,sent))
 
-    
-    negcutoff = len(negfeats)* .75 # 3/4 training set
-    poscutoff = len(posfeats)* .75 
+    negcutoff = len(negfeats)*3/4 # 3/4 training set
+    poscutoff = len(posfeats)*3/4 
 
     trainfeats = negfeats[:negcutoff] + posfeats[:poscutoff]
     testfeats  = negfeats[negcutoff:] + posfeats[poscutoff:]
@@ -57,34 +55,33 @@ def train(feat_ext, train_samples=400000, force_update=False):
 
     classifier = NaiveBayesClassifier.train(trainfeats)
 
-    print 'Done training ...'
-    print 'Storing to redis ...'
+    print('Done training ...')
+    
     man.store_classifier(classifier)
-    print 'Stored.'
-    print('Done training.')
+    print('Stored to Redis ...')
 
-#    refsets = collections.defaultdict(set)
-#    testsets = collections.defaultdict(set)
+#   refsets = collections.defaultdict(set)
+#   testsets = collections.defaultdict(set)
 
-#    for i, (feats, label) in enumerate(testfeats):
-#        if feats:
-#            refsets[label].add(i)
-#            observed = classifier.classify(feats)
-#            testsets[observed].add(i)
+#   for i, (feats, label) in enumerate(testfeats):
+#       if feats:
+#           refsets[label].add(i)
+#           observed = classifier.classify(feats)
+#           testsets[observed].add(i)
 #
-#    print '#### POSITIVE ####'
-#    print 'pos precision:', nltk.metrics.precision(refsets['pos'], testsets['pos'])
-#    print 'pos recall:', nltk.metrics.recall(refsets['pos'], testsets['pos'])
-#    print 'pos F-measure:', nltk.metrics.f_measure(refsets['pos'], testsets['pos'])
-#    print
-#    print '#### NEGATIVE ####'
-#    print 'neg precision:', nltk.metrics.precision(refsets['neg'], testsets['neg'])
-#    print 'neg recall:', nltk.metrics.recall(refsets['neg'], testsets['neg'])
-#    print 'neg F-measure:', nltk.metrics.f_measure(refsets['neg'], testsets['neg'])
-#
+#   print '#### POSITIVE ####'
+#   print 'pos precision:', nltk.metrics.precision(refsets['pos'], testsets['pos'])
+#   print 'pos recall:', nltk.metrics.recall(refsets['pos'], testsets['pos'])
+#   print 'pos F-measure:', nltk.metrics.f_measure(refsets['pos'], testsets['pos'])
+#   print
+#   print '#### NEGATIVE ####'
+#   print 'neg precision:', nltk.metrics.precision(refsets['neg'], testsets['neg'])
+#   print 'neg recall:', nltk.metrics.recall(refsets['neg'], testsets['neg'])
+#   print 'neg F-measure:', nltk.metrics.f_measure(refsets['neg'], testsets['neg'])
+
     #print '--------------------'
-    #print 'Classifier Accuracy:', util.accuracy(classifier, testfeats)
-    #classifier.show_most_informative_features(50)
+    print('Classifier Accuracy:', util.accuracy(classifier, testfeats))
+    classifier.show_most_informative_features(50)
 
 
 #References: http://streamhacker.com/
@@ -134,14 +131,4 @@ def train(feat_ext, train_samples=400000, force_update=False):
 #    classifier.show_most_informative_features()
 
 if __name__ == "__main__":
-    
-    train(best_word_feats, force_update=False)
-
-    man = RedisManager()
-    print('Loading classifier ...')
-    c = man.load_classifier()
-    c.most_informative_features(50)
-
-    print('Returning best words ...')
-    c.get_best_words(100)
-
+    train(best_word_feats, train_samples=100, force_update=False)

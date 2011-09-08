@@ -23,7 +23,7 @@ class RedisManager(object):
             self.r.flushdb()
 
 
-    def build_freqdists(self, n=300000):
+    def build_freqdists(self, token_range=150000):
         """
         Build word and label freq dists from the stored words with n words
         and store the resulting FreqDists in Redis.
@@ -35,8 +35,8 @@ class RedisManager(object):
         word_freqdist = FreqDist()
         label_word_freqdist = ConditionalFreqDist()
 
-        pos_words = self.r.zrange('positive_wordcounts', 0, n, withscores=True, desc=True)
-        neg_words = self.r.zrange('negative_wordcounts', 0, n, withscores=True, desc=True)
+        pos_words = self.r.zrange('positive_wordcounts', 0, token_range, withscores=True, desc=True)
+        neg_words = self.r.zrange('negative_wordcounts', 0, token_range, withscores=True, desc=True)
 
         assert pos_words and neg_words, 'Requires wordcounts to be stored in redis.'
 
@@ -53,7 +53,7 @@ class RedisManager(object):
         self.r.set('label_fd', pickle.dumps(label_word_freqdist))
         
 
-    def store_word_counts(self, word_samples_count=300000):
+    def store_word_counts(self, samples_to_use=300000):
         """
         Stores word counts for label in Redis with the ability to increment.
         """
@@ -62,7 +62,7 @@ class RedisManager(object):
             print 'Returning cached ...1'
             return
        
-        samples = get_samples(word_samples_count)
+        samples = get_samples(samples_to_use)
         assert samples, "Samples must be provided."
 
         for text, label in samples:
@@ -110,7 +110,7 @@ class RedisManager(object):
         """
         Stores a pickled a classifier into Redis.
         """
-        dumped = pickle.dumps(classifier, protocol=pickle.HIGHEST_PROTOCOL)
+        dumped = pickle.dumps(classifier, protocol=1)
         self.r.set(name, dumped)
         
 

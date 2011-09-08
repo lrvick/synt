@@ -10,7 +10,7 @@ import synt.settings as settings
 try:
     BEST_WORDS = RedisManager().get_best_words() 
 except ValueError: 
-    pass 
+    raise
 
 def word_feats(words):
     """Basic word features, simple bag of words model"""
