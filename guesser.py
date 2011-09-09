@@ -14,4 +14,8 @@ def guess(text, classifier=DEFAULT_CLASSIFIER):
     if bag_of_words:
         guess = classifier.classify(bag_of_words)
         prob = classifier.prob_classify(bag_of_words)
-        return (guess, [(prob.prob(sample),sample) for sample in prob.samples()])
+        
+        #return a -1 .. 1 score
+        score = prob.prob('positive') - prob.prob('negative')
+        
+        return score
