@@ -11,9 +11,11 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     wordcount_range=150000, force_update=False):
     """
     Trains a Naive Bayes classifier with samples from database and stores it in Redis.
-   
-    Keyword arguments:
+  
+    Args:
     featx             -- the feature extractor to use, found in utils/extractors.py
+
+    Keyword arguments:
     train_samples     -- the amount of database samples to use will become half pos half neg
     wordcount_samples -- the amount of samples to extract word counts for, these will be used
                          for the FreqDists
