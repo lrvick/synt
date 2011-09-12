@@ -22,10 +22,21 @@
     ```git clone git@github.com:Tawlk/synt.git```
 
 
-  2. Grab the sample database to train on:
+  2. Grab the sample database to train on (or build one (below)):
 
     ```wget -O - "https://github.com/downloads/Tawlk/synt/sample_data.bz2" | bzcat | sqlite3 sample_data.db```
 
+    If you'd prefer to build a fresh sample db and have the time:
+
+    ```python
+    python2.7 collector.py
+    ```
+    
+    Ctrl+C to stop it. 
+
+    **Note**: This also can update an existing database, if you decided to
+    initially wget the db but want to add more content the above should still
+    work.
 
   3. Run ```python2.7 trainer.py``` to build classifier.
 
