@@ -10,7 +10,7 @@ def db_init():
     if not os.path.exists(settings.DB_FILE):
         conn = sqlite3.connect(settings.DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE item (id integer primary key, item_id text unique, formatted_text text unique, text text unique, sentiment text)''')
+        cursor.execute('''CREATE TABLE item (id integer primary key, item_id text unique, text text unique, sentiment text)''')
     else:
         conn = sqlite3.connect(settings.DB_FILE)
     return conn
