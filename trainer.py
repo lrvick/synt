@@ -6,12 +6,21 @@ from synt.utils.db import get_samples
 from synt.utils.text import sanitize_text
 import nltk.metrics
 
+
 def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     wordcount_range=150000, force_update=False):
     """
-    Trains a Naive Bayes classifier with samples from database and stores it in redis.
-    
-    Force update will force a new train.
+    Trains a Naive Bayes classifier with samples from database and stores it in Redis.
+   
+    Keyword arguments:
+    featx             -- the feature extractor to use, found in utils/extractors.py
+    train_samples     -- the amount of database samples to use will become half pos half neg
+    wordcount_samples -- the amount of samples to extract word counts for, these will be used
+                         for the FreqDists
+    wordcount_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
+                         'popular' words up to this amount. i.e top 150000 tokens 
+    force_update      -- if True will drop the Redis DB and assume a fresh train 
+
     """
    
     man = RedisManager(force_update=force_update)
