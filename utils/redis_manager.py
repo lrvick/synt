@@ -135,10 +135,17 @@ class RedisManager(object):
         self.r.set('best_words', best)
         
 
-    def get_best_words(self):
+    def get_best_words(self, scores=False):
         """
         Return cached best_words
-        """
-        if 'best_words' in self.r.keys():
-            return ast.literal_eval(self.r.get('best_words'))
 
+        If scores provided will return word/score tuple.
+        """
+
+        if 'best_words' in self.r.keys():
+            best_words =  ast.literal_eval(self.r.get('best_words'))
+
+            if not scores:
+                best_words = [w[0] for w in best_words]
+
+            return best_words
