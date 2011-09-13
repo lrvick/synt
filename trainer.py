@@ -41,24 +41,26 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     man.store_best_words()
 
     samples = get_samples(train_samples)
-    print samples
 
-    half = train_samples / 2
-
-    neg_samples = samples[half:]
-    pos_samples = samples[:half]
+    half = len(samples) / 2
     
+    pos_samples = samples[:half]
+    neg_samples = samples[half:]
+   
     print('Build negfeats and posfeats')
     negfeats, posfeats = [], []
+
     for text, sent in neg_samples:
-        tokens = feat_ex(sanitize_text(text))
-        print tokens
+        s_text = sanitize_text(text)
+        tokens = feat_ex(s_text)
+        
         if tokens:
             negfeats.append((tokens,sent))
     
     for text, sent in pos_samples:
-        tokens = feat_ex(sanitize_text(text))
-        print tokens
+        s_text = sanitize_text(text)
+        tokens = feat_ex(s_text) 
+        
         if tokens:
             posfeats.append((tokens,sent))
    
