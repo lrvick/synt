@@ -37,26 +37,34 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     man.build_freqdists(wordcount_range)
     print('Storing word scores.')
     man.store_word_scores()
+    print('Storing best words.')
+    man.store_best_words()
 
     samples = get_samples(train_samples)
-    
+    print samples
+
     half = train_samples / 2
 
     neg_samples = samples[half:]
     pos_samples = samples[:half]
     
+    print('Build negfeats and posfeats')
     negfeats, posfeats = [], []
     for text, sent in neg_samples:
         tokens = feat_ex(sanitize_text(text))
+        print tokens
         if tokens:
             negfeats.append((tokens,sent))
     
     for text, sent in pos_samples:
         tokens = feat_ex(sanitize_text(text))
+        print tokens
         if tokens:
             posfeats.append((tokens,sent))
-    
-    print('Build negfeats and posfeats')
+   
+    if not (negfeats or posfeats):
+        print( "Could not build positive and negative features.")
+        return
 
     negcutoff = len(negfeats)*3/4 # 3/4 training set
     poscutoff = len(posfeats)*3/4 

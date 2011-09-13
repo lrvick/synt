@@ -124,14 +124,21 @@ class RedisManager(object):
         if self.r.exists(label):
             return self.r.zrange(label, start, end, withscores=True, desc=True) 
 
-    def get_best_words(self, n=10000):
-        """Return n best words."""
+    def store_best_words(self, n=10000):
+        """Store n best words to Redis."""
 
         word_scores = ast.literal_eval(self.r.get('word_scores')) #str -> dict
             
         assert word_scores, "Word scores need to exist."
 
         best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
-        return set([w for w,s in best])
+        self.r.set('best_words', best)
+        
 
+    def get_best_words(self):
+        """
+        Return cached best_words
+        """
+        if 'best_words' in self.r.keys():
+            return ast.literal_eval(self.r.get('best_words'))
 

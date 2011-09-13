@@ -5,11 +5,7 @@ from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
 
 from synt.utils.redis_manager import RedisManager
-import synt.settings as settings
-
-man = RedisManager()
-if 'word_scores' in man.r.keys():
-    BEST_WORDS = man.get_best_words()
+import itertools
 
 def word_feats(words):
     """Basic word features, simple bag of words model"""
@@ -24,6 +20,7 @@ def stopword_word_feats(words):
 
 def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withstopwords=True):
     """Word features with bigrams"""
+    
     if not words: return
     bigram_finder = BigramCollocationFinder.from_words(words)
     bigrams = bigram_finder.nbest(score_fn, n)
@@ -31,11 +28,14 @@ def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withsto
 
 def best_word_feats(words):
     """Word feats with best words."""
-    if not (words and BEST_WORDS): return
-    return dict([(word, True) for word in words if word in BEST_WORDS])
+    
+    best_words = RedisManager().get_best_words()
+    if not (words and best_words): return
+    return dict([(word, True) for word in words if word in best_words])
 
 def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
     """Word features with bigrams and best words."""
+    
     if not words: return
     bigram_finder = BigramCollocationFinder.from_words(words)
     bigrams = bigram_finder.nbest(score_fn, n)
