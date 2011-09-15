@@ -1,14 +1,12 @@
 from nltk.classify import NaiveBayesClassifier, util
-from collections import defaultdict
 from utils.redis_manager import RedisManager
 from synt.utils.extractors import best_word_feats
 from synt.utils.db import get_samples
 from synt.utils.text import sanitize_text
-import nltk.metrics
-
+from synt.logger import create_logger
 
 def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
-    wordcount_range=150000, force_update=False):
+    wordcount_range=150000, force_update=False, verbose=True):
     """
     Trains a Naive Bayes classifier with samples from database and stores it in Redis.
   
@@ -22,22 +20,26 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     wordcount_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
                          'popular' words up to this amount. i.e top 150000 tokens 
     force_update      -- if True will drop the Redis DB and assume a fresh train 
-
+    verbose           -- if true will display output on console
     """
-   
+    
+    logger = create_logger(__file__)
+    if not verbose: #no output
+        logger.setLevel(0)
+
     man = RedisManager(force_update=force_update)
 
     if 'classifier' in man.r.keys():
-        print("Trained classifier exists in Redis.")
+        logger.info("Trained classifier exists in Redis.")
         return
 
-    print('Storing %d word counts.' % wordcount_samples)
+    logger.info('Storing %d word counts.' % wordcount_samples)
     man.store_word_counts(wordcount_samples)
-    print('Build frequency distributions with %d words.' % wordcount_range)
+    logger.info('Build frequency distributions with %d words.' % wordcount_range)
     man.build_freqdists(wordcount_range)
-    print('Storing word scores.')
+    logger.info('Storing word scores.')
     man.store_word_scores()
-    print('Storing best words.')
+    logger.info('Storing best words.')
     man.store_best_words()
 
     samples = get_samples(train_samples)
@@ -47,7 +49,7 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
     pos_samples = samples[:half]
     neg_samples = samples[half:]
    
-    print('Build negfeats and posfeats')
+    logger.info('Build negfeats and posfeats')
     negfeats, posfeats = [], []
 
     for text, sent in neg_samples:
@@ -65,7 +67,7 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
             posfeats.append((tokens,sent))
    
     if not (negfeats or posfeats):
-        print( "Could not build positive and negative features.")
+        logger.error( "Could not build positive and negative features.")
         return
 
     negcutoff = len(negfeats)*3/4 # 3/4 training set
@@ -73,14 +75,14 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
 
     trainfeats = negfeats[:negcutoff] + posfeats[:poscutoff]
     testfeats  = negfeats[negcutoff:] + posfeats[poscutoff:]
-    print('Train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats)))
+    logger.info('Train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats)))
 
     classifier = NaiveBayesClassifier.train(trainfeats)
 
-    print('Done training ...')
+    logger.info('Done training')
     
     man.store_classifier(classifier)
-    print('Stored to Redis ...')
+    logger.info('Stored to Redis')
 
 #   refsets = collections.defaultdict(set)
 #   testsets = collections.defaultdict(set)
@@ -102,8 +104,10 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
 #   print 'neg F-measure:', nltk.metrics.f_measure(refsets['neg'], testsets['neg'])
 
     #print '--------------------'
-    print('Classifier Accuracy:', util.accuracy(classifier, testfeats))
-    classifier.show_most_informative_features(50)
+    logger.info('Classifier Accuracy: %s' % util.accuracy(classifier, testfeats))
+    
+    if verbose:
+        classifier.show_most_informative_features(50)
 
 
 #References: http://streamhacker.com/
@@ -153,4 +157,4 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
 #    classifier.show_most_informative_features()
 
 if __name__ == "__main__":
-    train(best_word_feats, force_update=False)
+    train(best_word_feats, force_update=False, verbose=True)
