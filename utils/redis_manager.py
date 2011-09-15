@@ -11,13 +11,13 @@ from synt.utils.db import get_samples
 
 class RedisManager(object):
 
-    def __init__(self, force_update=False):
+    def __init__(self, db=0, force_update=False):
         """
         Initializes redis. If force_update is true
         will flush the database and assume an initial setup.
         """
         
-        self.r = redis.Redis()
+        self.r = redis.Redis(db=db)
         self.force_update = force_update
         if self.force_update:
             self.r.flushdb()
