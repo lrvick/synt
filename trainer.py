@@ -5,7 +5,7 @@ from synt.utils.db import get_samples
 from synt.utils.text import sanitize_text
 from synt.logger import create_logger
 
-def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
+def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=300000, \
     wordcount_range=150000, force_update=False, verbose=True):
     """
     Trains a Naive Bayes classifier with samples from database and stores it in Redis.
@@ -105,9 +105,6 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
 
     #print '--------------------'
     logger.info('Classifier Accuracy: %s' % util.accuracy(classifier, testfeats))
-    
-    if verbose:
-        classifier.show_most_informative_features(50)
 
 
 #References: http://streamhacker.com/
@@ -157,4 +154,13 @@ def train(feat_ex, train_samples=400000, wordcount_samples=300000, \
 #    classifier.show_most_informative_features()
 
 if __name__ == "__main__":
-    train(best_word_feats, force_update=False, verbose=True)
+    train(
+        train_samples=2000,
+        wordcount_samples=1000,
+        wordcount_range=2000,
+        force_update=False,
+        verbose=True
+    )
+    from tester import test
+    test()
+
