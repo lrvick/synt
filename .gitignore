@@ -3,6 +3,7 @@
 # Python poop
 *.pyc
 *.wsgi
+*.egg-info
 
 # DB dregs
 *.db
