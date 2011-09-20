@@ -12,7 +12,7 @@ setup(
     description='Synt (pronounced: "cent") is a python library aiming to be a general solution to identifying a given peice of text, particularly social network statuses, as either negative, neutral, or positive.',
     long_description=open('README.md').read(),
     install_requires=[
-        'pyyaml',
+        'PyYAML==3.09',
         'redis',
         'nltk==2.0.1rc1'
     ]
