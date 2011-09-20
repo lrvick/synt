@@ -1,3 +1,0 @@
-redis
-pyyaml
-nltk==2.0.1rc1

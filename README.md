@@ -20,14 +20,19 @@
   * A running [Redis](http://redis.com) server
   * pip
   * virtualenv (recommended)
-  * python 2.7
+  * python 2.7 
+    * sqlite3 issue was fixed in 2.7 [issue](http://code.google.com/p/pysqlite/source/detail?r=9e3fa82223b89ca4e7f9eadedc1297ab5c3eebd9)
+    * argparse
+  * PyYAML==3.09 
+    * unfortnatley nltk requires pyyaml before it can be installed [bug](http://code.google.com/p/nltk/issues/detail?id=508)
+    
 
 ## Usage / Installation ##
 
   1. Grab the latest synt:
 
     ```bash
-    pip install synt
+    pip install -e git+https://github.com/Tawlk/synt/#egg=synt
     ```
 
   2. Grab the sample database to train on (or build one (below)):
