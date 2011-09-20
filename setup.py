@@ -14,7 +14,8 @@ setup(
     install_requires=[
         'pyyaml',
         'redis',
-        'nltk'
+        'http://pypi.python.org/packages/source/n/nltk/nltk-2.0.1rc1.tar.gz', 
+        
     ]
 
 )
