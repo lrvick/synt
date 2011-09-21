@@ -18,9 +18,9 @@
 ## Requirements ##
 
   * A running [Redis](http://redis.com) server
-  * pip
-  * virtualenv (recommended)
-  * python 2.7
+  * [pip](http://www.pip-installer.org/en/latest/index.html)
+  * [virtualenv](http://www.virtualenv.org/en/latest/index.html) (recommended)
+  * [python2.7](http://www.python.org/getit/releases/2.7/)
     * sqlite3 issue was fixed in 2.7 [issue](http://code.google.com/p/pysqlite/source/detail?r=9e3fa82223b89ca4e7f9eadedc1297ab5c3eebd9)
     * argparse
   * PyYAML==3.09
