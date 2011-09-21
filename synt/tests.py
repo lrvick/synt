@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import unittest
 from synt.trainer import train
 from synt.utils import best_word_feats, RedisManager

@@ -1,8 +1,8 @@
+# -*- coding: utf-8 -*-
 """Tools for interacting with Redis"""
 
 import ast
 import redis
-import itertools
 import cPickle as pickle
 from nltk.probability import FreqDist, ConditionalFreqDist
 from nltk.metrics import BigramAssocMeasures
@@ -25,7 +25,7 @@ class RedisManager(object):
 
     def build_freqdists(self, wordcount_range=150000):
         """
-        Build word and label freq dists from the stored words with n words
+        Build word and label freq dists from the stored words with 'wordcount_range' words
         and store the resulting FreqDists in Redis.
 
         This cannot be cached as we have to continously update these values
@@ -55,7 +55,7 @@ class RedisManager(object):
 
     def store_word_counts(self, wordcount_samples=300000):
         """
-        Stores word counts for label in Redis with the ability to increment.
+        Stores word:count histograms for samples in Redis with the ability to increment.
         """
 
         if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
@@ -76,7 +76,6 @@ class RedisManager(object):
     def store_word_scores(self):
         """
         Stores 'word scores' into Redis.
-        
         """
         
         try:
@@ -134,7 +133,6 @@ class RedisManager(object):
         best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
         self.r.set('best_words', best)
         
-
     def get_best_words(self, scores=False):
         """
         Return cached best_words

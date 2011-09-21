@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import logging
 
 def create_logger(name, level=logging.DEBUG):

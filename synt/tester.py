@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import nltk.classify.util
 from synt.utils.db import get_samples
 from synt.utils.redis_manager import RedisManager
@@ -5,11 +6,15 @@ from synt.utils.text import sanitize_text
 from synt.utils.extractors import best_word_feats
 from synt.guesser import guess
 
-def test(test_samples=200000):
+def test(test_samples=200000, feat_ex=best_word_feats):
     """
     This first returns the accuracy of the classifier then proceeds
     to test across known sentiments and produces a 'manual accuracy score'.
-
+    
+    Keyword Arguments:
+    test_samples    -- the amount of samples to test against
+    feat_ext        -- the feature extractor to use (utils/extractors)
+    
     """
 
     classifier = RedisManager().load_classifier()
@@ -17,8 +22,6 @@ def test(test_samples=200000):
     if not classifier:
         print("There is not classifier in Redis yet, have you trained?")
         return
-
-    feat_ex = best_word_feats
 
     results = []
     nltk_testing_dicts = []
@@ -28,6 +31,7 @@ def test(test_samples=200000):
     samples = get_samples(test_samples)
     
     for sample in samples:
+        
         text, sentiment = sample[0], sample[1] #(text, sentiment)
         tokens = sanitize_text(text)
         
@@ -69,4 +73,5 @@ def test(test_samples=200000):
 
 
 if __name__ == "__main__":
+    #example test on 100 samples
     test(100)

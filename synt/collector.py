@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import time
 import os
 import bz2
@@ -6,7 +7,7 @@ from cStringIO import StringIO
 from synt.utils.collect import twitter_feed
 from synt.utils.db import db_init
 from synt.logger import create_logger
-import settings
+from synt import settings
 
 logger = create_logger(__file__)
 

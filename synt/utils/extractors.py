@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Tools for extracting features and text processing."""
 
 from nltk.corpus import stopwords

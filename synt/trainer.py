@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from nltk.classify import NaiveBayesClassifier, util
 from utils.redis_manager import RedisManager
 from synt.utils.extractors import best_word_feats
@@ -8,19 +9,19 @@ from synt.logger import create_logger
 def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=300000, \
     wordcount_range=150000, force_update=False, verbose=True):
     """
-    Trains a Naive Bayes classifier with samples from database and stores it in Redis.
+    Trains a Naive Bayes classifier with samples from database and stores the 
+    resulting classifier in Redis.
   
     Args:
     featx             -- the feature extractor to use, found in utils/extractors.py
 
     Keyword arguments:
-    train_samples     -- the amount of database samples to use will become half pos half neg
-    wordcount_samples -- the amount of samples to extract word counts for, these will be used
-                         for the FreqDists
+    train_samples     -- the amount of samples to train half this number will be negative the other positive 
+    wordcount_samples -- the amount of samples to build wordcounts, this produces a word:count histogram in Redis 
     wordcount_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
                          'popular' words up to this amount. i.e top 150000 tokens 
-    force_update      -- if True will drop the Redis DB and assume a fresh train 
-    verbose           -- if true will display output on console
+    force_update      -- if True will drop the Redis DB and assume a new train 
+    verbose           -- if True will output to console
     """
     
     logger = create_logger(__file__)
@@ -78,7 +79,6 @@ def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=30000
     logger.info('Train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats)))
 
     classifier = NaiveBayesClassifier.train(trainfeats)
-
     logger.info('Done training')
     
     man.store_classifier(classifier)
@@ -154,6 +154,7 @@ def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=30000
 #    classifier.show_most_informative_features()
 
 if __name__ == "__main__":
+    #example train and tester.test to display accuracies
     train(
         train_samples=2000,
         wordcount_samples=1000,

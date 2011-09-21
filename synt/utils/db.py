@@ -1,8 +1,8 @@
+# -*- coding: utf-8 -*-
 """Functions that interact with or initial the database."""
 import os
 import sqlite3
-
-import synt.settings as settings
+from synt import settings
 
 def db_init(create=True):
     """Initializes the sqlite3 database."""

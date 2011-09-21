@@ -1,9 +1,15 @@
+# -*- coding: utf-8 -*-
 from synt.trainer import train
 from synt.collector import collect, fetch
 from synt.guesser import guess
 from synt.tester import test
 
-import argparse
+try:
+    import argparse
+except ImportError:
+    raise
+
+VERSION = '0.1.0'
 
 def main():
 

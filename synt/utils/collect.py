@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Tools for collecting sample data."""
 
 import simplejson as json

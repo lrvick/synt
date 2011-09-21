@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from .text import sanitize_text
 from .redis_manager import RedisManager
 from .db import get_samples
