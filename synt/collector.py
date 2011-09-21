@@ -1,10 +1,10 @@
 import time
 import os
 import bz2
-import sqlite3
 import urllib2
 from cStringIO import StringIO
 from synt.utils.collect import twitter_feed
+from synt.utils.db import db_init
 from synt.logger import create_logger
 import settings
 
@@ -51,6 +51,7 @@ def fetch(verbose=True):
     """
     Pre-populates training database from public archive of ~2mil tweets
     """
+
     if not verbose:
         logger.setLevel(0)
 
@@ -65,14 +66,11 @@ def fetch(verbose=True):
 
     decompressor = bz2.BZ2Decompressor()
 
-    if not os.path.exists(os.path.expanduser('~/.synt')):
-        os.makedirs(os.path.expanduser('~/.synt/'))
+    if os.path.exists(settings.DB_FILE):
+        os.remove(settings.DB_FILE)
 
-    if os.path.exists(os.path.expanduser('~/.synt/samples.db')):
-        os.remove(os.path.expanduser('~/.synt/samples.db'))
-
-    conn = sqlite3.connect(os.path.expanduser('~/.synt/samples.db'))
-    conn.set_progress_handler(import_progress,20)
+    db = db_init(create=False)
+    db.set_progress_handler(import_progress,20)
 
     while True:
         seconds = (time.time() - start_time)
@@ -97,7 +95,7 @@ def fetch(verbose=True):
         if saved_bytes == total_bytes:
             logger.info("Downloaded %d of %d Mb, %s%s (100%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type))
             try:
-                conn.executescript(data_buffer.getvalue())
+                db.executescript(data_buffer.getvalue())
             except Exception, e:
                 logger.error("Sqlite3 import failed with: %s" % e)
                 break
