@@ -1,5 +1,5 @@
 from synt.trainer import train
-from synt.collector import collect
+from synt.collector import collect, fetch
 from synt.guesser import guess
 from synt.tester import test
 
@@ -20,7 +20,7 @@ def main():
             default=2000,
             help="""The amount of samples to train on."""
     )
-    
+
     parser_train.add_argument(
             '--wc_samples',
             action='store',
@@ -38,7 +38,7 @@ def main():
             default=2000,
             help="""This is the actual amount of words to use to build freqDists. By this point (depending on how many word samples used) you will have a lot of tokens. Most of these tokens are uninformative and produce nothing but noise. This is the first layer of cutting down that batch to something reasonable. The number provided will use words
             from 0 .. wc_range. Words are already sorted by most frequent to least."""
-            
+
     )
     parser_train.add_argument(
         '--fresh',
@@ -47,7 +47,7 @@ def main():
         default=False,
         help="""If True this will force a new train, useful to test various sample, wordcount combinations. 1 = True 0 = False"""
     )
-    
+
     parser_train.add_argument(
         '--verbose',
         action='store',
@@ -77,7 +77,7 @@ def main():
         'tester',
         description = """Tests the accuracy of the classifier."""
     )
-    
+
     parser_tester.add_argument(
         '--test_samples',
         action='store',
@@ -86,7 +86,7 @@ def main():
     )
 
     args = parser.parse_args()
-    
+
     if args.parser == 'train':
         train(
             train_samples=args.train_samples,
@@ -95,9 +95,12 @@ def main():
             verbose=args.verbose,
             force_update=args.fresh,
     )
-   
+
     if args.parser == 'collect':
-        #interface susceptible to change
+        if args.fetch:
+            fetch()
+        else:
+            collect()
         pass
 
     if args.parser == 'guess':

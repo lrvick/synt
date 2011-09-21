@@ -5,7 +5,10 @@ import sqlite3
 import urllib2
 from cStringIO import StringIO
 from synt.utils.collect import twitter_feed
+from synt.logger import create_logger
 import settings
+
+logger = create_logger(__file__)
 
 def collect():
     """
@@ -28,11 +31,28 @@ def collect():
         except:
             raise
 
+def import_progress():
+    global logger, output_count, prcount
+    try:
+        prcount
+        output_count
+    except:
+        prcount=0
+        output_count = 500000
+    prcount += 20
+    output_count += 20
+    if output_count >= 500000:
+        output_count = 0
+        percent = round((float(prcount) / 40423300 )*100, 2)
+        logger.info("Processed %s of 40423300 records (%0.2f%%)" % (prcount,percent))
+    return 0
 
-def fetch():
+def fetch(verbose=True):
     """
     Pre-populates training database from public archive of ~2mil tweets
     """
+    if not verbose:
+        logger.setLevel(0)
 
     response = urllib2.urlopen('https://github.com/downloads/Tawlk/synt/sample_data.bz2')
 
@@ -52,19 +72,6 @@ def fetch():
         os.remove(os.path.expanduser('~/.synt/samples.db'))
 
     conn = sqlite3.connect(os.path.expanduser('~/.synt/samples.db'))
-
-    prcount=0
-    output_count = 500000
-    def import_progress():
-        global output_count, prcount, sql_lines
-        prcount += 20
-        output_count += 20
-        if output_count >= 500000:
-            output_count = 0
-            percent = round((float(prcount) / 40423300 )*100, 2)
-            print "Processed %s of 40423300 records (%0.2f%%)" % (prcount,percent)
-        return 0
-
     conn.set_progress_handler(import_progress,20)
 
     while True:
@@ -84,15 +91,15 @@ def fetch():
             if last_seconds >= 0.5:
                 last_seconds = 0
                 last_seconds_start = time.time()
-                print("Downloaded %d of %d Mb, %s%s (%0.2f%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type, percent))
+                logger.info("Downloaded %d of %d Mb, %s%s (%0.2f%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type, percent))
             else:
                 last_seconds = (time.time() - last_seconds_start)
         if saved_bytes == total_bytes:
-            print("Downloaded %d of %d Mb, %s%s (100%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type))
+            logger.info("Downloaded %d of %d Mb, %s%s (100%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type))
             try:
                 conn.executescript(data_buffer.getvalue())
             except Exception, e:
-                print("Sqlite3 import failed with: %s" % e)
+                logger.error("Sqlite3 import failed with: %s" % e)
                 break
 
 
