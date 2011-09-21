@@ -4,7 +4,6 @@ import simplejson as json
 import urllib2
 import sqlite3
 from synt.utils.db import db_init
-from synt.utils.text import sanitize_text
 
 def twitter_feed(sentiment, last_id=None, new=False):
     """
@@ -13,11 +12,11 @@ def twitter_feed(sentiment, last_id=None, new=False):
     What is flagged as positive and negative iscurrently determined
     by happy/sad faces.
     """
-    
+
     db = db_init()
     cursor = db.cursor()
 
-    if sentiment == 'positive': 
+    if sentiment == 'positive':
         query = ':)'
     elif sentiment == 'negative':
         query = ':('
@@ -26,7 +25,7 @@ def twitter_feed(sentiment, last_id=None, new=False):
         return
 
     last_id_url = "http://search.twitter.com/search.json?lang=en&q=%s&since_id=%s"
-    query_url   = "http://search.twitter.com/search.json?lang=en&q=%s" 
+    query_url   = "http://search.twitter.com/search.json?lang=en&q=%s"
 
     if not (last_id or new):
         cursor.execute('SELECT item_id FROM item WHERE sentiment=? ORDER BY item_id DESC LIMIT 1', [sentiment])
@@ -36,8 +35,6 @@ def twitter_feed(sentiment, last_id=None, new=False):
         url = last_id_url  % (query, last_id)
     elif new:
         url = query_url % query
-    
-    print(url) 
 
     data = []
 
@@ -45,21 +42,21 @@ def twitter_feed(sentiment, last_id=None, new=False):
         data = json.loads(urllib2.urlopen(url).read())
     except:
         raise
-    
+
     if data:
-        
+
         items = data['results']
         cursor.execute('SELECT COUNT() FROM item WHERE sentiment = ?',[sentiment])
         total_rows = cursor.fetchone()[0]
-        
+
         for item in items:
-            
+
             text = unicode(item['text']) #force unicode for db
-            
+
             if text:
-                
+
                 item_id = item['id']
-                
+
                 try:
                     cursor.execute('INSERT INTO item VALUES (NULL,?,?,?)', [item_id, text, sentiment])
                     last_id = item_id
