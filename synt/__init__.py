@@ -80,15 +80,15 @@ def main():
 
     #tester commmand
     parser_tester = subparsers.add_parser(
-        'tester',
-        description = """Tests the accuracy of the classifier."""
+        'test',
+        description = """Runs the tester test function to test accuracy. You can provide a number of samples by --samples [num]""" 
     )
-
+    
     parser_tester.add_argument(
-        '--test_samples',
+        '--samples',
         action='store',
         type=int,
-        help='The amount of test_samples to test against.'
+        help='Tests the accuracy with number of samples as test samples.',
     )
 
     args = parser.parse_args()
@@ -111,10 +111,13 @@ def main():
 
     if args.parser == 'guess':
         text = args.text.strip()
-        print(guess(text=u''+text))
+        print(guess(text=text))
 
-    if args.parser == 'tester':
-        test(test_samples=args.test_samples)
+    if args.parser == 'test':
+        if args.samples:
+            test(test_samples=args.samples)
+        else: #runs with default test_samples
+            test()
 
 if __name__ == '__main__':
     main()
