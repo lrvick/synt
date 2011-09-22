@@ -10,10 +10,7 @@ class TrainerTestCase(unittest.TestCase):
         self.man = RedisManager(db='testing')
 
     def test_train_success(self):
-        """
-        Test that train completes, classifier stored in redis.
-        """
-        
+        #stores classifier in redis
         train(
             feat_ex=best_word_feats,
             train_samples=100,
@@ -30,7 +27,6 @@ class GuesserTestCase(unittest.TestCase):
     def setUp(self):
         self.man = RedisManager(db='testing')
         
-        #set up to get a classifier
         #stores a classifier in redis
         train(
             feat_ex=best_word_feats,
@@ -39,30 +35,24 @@ class GuesserTestCase(unittest.TestCase):
             verbose=False,
         )
 
-    def test_get_classifier(self):
-        """
-        Test we have a classifier to use.
-        """
-        
+    def test_load_classifier(self):
         classifier = self.man.load_classifier()
         self.assertIsNotNone(classifier)
 
-    def test_guess(self):
-        """
-        Test guess is returning a float between -1 and 1.
-        """
-
-        score = guess(u'some random text', classifier=self.man.load_classifier())
+    def test_guess_with_text(self):
+        score = guess('some random text', classifier=self.man.load_classifier())
         self.assertEqual(type(score), float)
+        self.assertTrue(-1.0 <= score <= 1.0) 
 
-        self.assertTrue(-1 <= score <= 1) 
-
-    def test_guess_nothing(self):
-        """
-        Test it can handle nothing being passed.
-        """
+    def test_guess_no_text(self):
         score = guess('', classifier=self.man.load_classifier())
-        self.assertIsNone(score)
+        self.assertEqual(type(score), float)
+        self.asserEqual(score, 0.0)
+
+    def test_guess_unicode(self):
+        score = guess("FOE JAPANが粘り強く主張していた避難の権利", classifier=self.man.load_classifier())
+        self.assertEqual(type(score), float)
+        self.assertTrue(-1.0 <= score <= 1.0) 
 
     def tearDown(self):
         self.man.r.flushdb()
