@@ -7,7 +7,6 @@ import cPickle as pickle
 from nltk.probability import FreqDist, ConditionalFreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
-from synt.utils.db import get_samples
 
 class RedisManager(object):
 
@@ -60,6 +59,7 @@ class RedisManager(object):
 
         if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
             return
+        from synt.utils.db import get_samples
        
         samples = get_samples(wordcount_samples)
         assert samples, "Samples must be provided."

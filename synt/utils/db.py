@@ -3,6 +3,7 @@
 import os
 import sqlite3
 from synt import settings
+from synt.utils.redis_manager import RedisManager
 
 def db_init(create=True):
     """Initializes the sqlite3 database."""
@@ -28,6 +29,12 @@ def get_sample_limit():
     from both tables.
     """
 
+    #this is an expensive operation in case of a large database
+    #therefore we store the limit in redis and use that when we can
+    man = RedisManager()
+    if 'limit' in man.r.keys():
+        return int(man.r.get('limit'))
+
     db = db_init()
     cursor = db.cursor()
     cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'positive'")
@@ -38,6 +45,10 @@ def get_sample_limit():
         limit = pos_count
     else:
         limit = neg_count
+    
+    #store to redis
+    man.r.set('limit', limit)
+    
     return limit
 
 
