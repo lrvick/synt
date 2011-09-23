@@ -19,6 +19,8 @@ def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats):
     tokens = sanitize_text(text)
     
     bag_of_words = feat_ex(tokens)
+   
+    score = 0.0
     
     if bag_of_words:
         
@@ -30,7 +32,7 @@ def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats):
         #if score doesn't fall within -1 and 1 return 0.0 
         #example: single words might return a heavily biased score like -9.8343
         if not (-1 <= score <= 1):
-            return 0.0
-        
-        return score
+            pass #score 0.0
+
+    return score
 

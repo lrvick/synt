@@ -31,7 +31,9 @@ def best_word_feats(words):
     """Word feats with best words."""
     
     best_words = RedisManager().get_best_words()
-    if not (words and best_words): return
+    if not best_words:
+        raise ValueError("This extractor relies on best_words to be stored in Redis, make sure you have trained first.")
+    if not words: return
     return dict([(word, True) for word in words if word in best_words])
 
 def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
