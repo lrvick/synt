@@ -47,7 +47,7 @@ class GuesserTestCase(unittest.TestCase):
     def test_guess_no_text(self):
         score = guess('', classifier=self.man.load_classifier())
         self.assertEqual(type(score), float)
-        self.asserEqual(score, 0.0)
+        self.assertEqual(score, 0.0)
 
     def test_guess_unicode(self):
         score = guess("FOE JAPANが粘り強く主張していた避難の権利", classifier=self.man.load_classifier())
