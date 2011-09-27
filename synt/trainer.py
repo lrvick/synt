@@ -6,20 +6,24 @@ from synt.utils.db import get_samples
 from synt.utils.text import sanitize_text
 from synt.logger import create_logger
 
-def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=300000, \
-    wordcount_range=150000, force_update=False, verbose=True):
+def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=200000, \
+    wordcount_range=150000,  bestwords_to_store=10000, force_update=False, verbose=True):
     """
     Trains a Naive Bayes classifier with samples from database and stores the 
     resulting classifier in Redis.
   
     Args:
-    featx             -- the feature extractor to use, found in utils/extractors.py
+    #TODO: Currently this works and is tested only with best_word_feats but this should 
+    #eventually work with various extractors.
+    
+    featx             -- the feature extractor to use, found in utils/extractors.py. 
 
     Keyword arguments:
     train_samples     -- the amount of samples to train half this number will be negative the other positive 
     wordcount_samples -- the amount of samples to build wordcounts, this produces a word:count histogram in Redis 
     wordcount_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
                          'popular' words up to this amount. i.e top 150000 tokens 
+    bestwords_to_store-- the amount of of words we will use in our 'best_words' list to filter by  
     force_update      -- if True will drop the Redis DB and assume a new train 
     verbose           -- if True will output to console
     """
@@ -34,14 +38,17 @@ def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=30000
         logger.info("Trained classifier exists in Redis.")
         return
 
-    logger.info('Storing %d word counts.' % wordcount_samples)
-    man.store_word_counts(wordcount_samples)
+    logger.info('Storing %d word counts.' % word_count_samples)
+    man.store_word_counts(word_count_samples)
+    
     logger.info('Build frequency distributions with %d words.' % wordcount_range)
     man.build_freqdists(wordcount_range)
+    
     logger.info('Storing word scores.')
     man.store_word_scores()
-    logger.info('Storing best words.')
-    man.store_best_words()
+    
+    logger.info('Storing "best" words.')
+    man.store_best_words(bestwords_to_store)
 
     samples = get_samples(train_samples)
 
@@ -50,7 +57,7 @@ def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=30000
     pos_samples = samples[:half]
     neg_samples = samples[half:]
    
-    logger.info('Build negfeats and posfeats')
+    logger.info('Building negfeats and posfeats')
     negfeats, posfeats = [], []
 
     for text, sent in neg_samples:
@@ -66,7 +73,8 @@ def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=30000
         
         if tokens:
             posfeats.append((tokens,sent))
-   
+
+    logger.info('Built negfeats and pos feats.')
     if not (negfeats or posfeats):
         logger.error( "Could not build positive and negative features.")
         return
@@ -84,26 +92,6 @@ def train(feat_ex=best_word_feats, train_samples=400000, wordcount_samples=30000
     man.store_classifier(classifier)
     logger.info('Stored to Redis')
 
-#   refsets = collections.defaultdict(set)
-#   testsets = collections.defaultdict(set)
-
-#   for i, (feats, label) in enumerate(testfeats):
-#       if feats:
-#           refsets[label].add(i)
-#           observed = classifier.classify(feats)
-#           testsets[observed].add(i)
-#
-#   print '#### POSITIVE ####'
-#   print 'pos precision:', nltk.metrics.precision(refsets['pos'], testsets['pos'])
-#   print 'pos recall:', nltk.metrics.recall(refsets['pos'], testsets['pos'])
-#   print 'pos F-measure:', nltk.metrics.f_measure(refsets['pos'], testsets['pos'])
-#   print
-#   print '#### NEGATIVE ####'
-#   print 'neg precision:', nltk.metrics.precision(refsets['neg'], testsets['neg'])
-#   print 'neg recall:', nltk.metrics.recall(refsets['neg'], testsets['neg'])
-#   print 'neg F-measure:', nltk.metrics.f_measure(refsets['neg'], testsets['neg'])
-
-    #print '--------------------'
     logger.info('Classifier Accuracy: %s' % util.accuracy(classifier, testfeats))
 
 
