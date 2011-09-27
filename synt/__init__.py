@@ -46,6 +46,15 @@ def main():
             from 0 .. wc_range. Words are already sorted by most frequent to least."""
 
     )
+
+    parser_train.add_argument(
+        '--bestwords_store',
+        action='store',
+        type='int',
+        default=10000,
+        help= """The amount of best words to store. This will become the filterable list of informative words that the best_word_feats extractor uses."""
+    )
+
     parser_train.add_argument(
         '--fresh',
         action='store',
@@ -98,6 +107,7 @@ def main():
             train_samples=args.train_samples,
             wordcount_samples=args.wc_samples,
             wordcount_range=args.wc_range,
+            bestwords_to_store=args.bestwords_store,
             verbose=args.verbose,
             force_update=args.fresh,
     )
