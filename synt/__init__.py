@@ -60,7 +60,7 @@ def main():
         action='store',
         type=int,
         default=False,
-        help="""If True this will force a new train, useful to test various sample, wordcount combinations. 1 = True 0 = False"""
+        help="""If True this will force a new train, useful to test various sample, word count combinations. 1 = True 0 = False"""
     )
 
     parser_train.add_argument(
@@ -108,7 +108,7 @@ def main():
         train(
             train_samples=args.train_samples,
             word_count_samples=args.wc_samples,
-            wordcount_range=args.wc_range,
+            word_count_range=args.wc_range,
             bestwords_to_store=args.bestwords_store,
             verbose=args.verbose,
             force_update=args.fresh,
