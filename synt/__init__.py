@@ -50,7 +50,7 @@ def main():
     parser_train.add_argument(
         '--bestwords_store',
         action='store',
-        type='int',
+        type=int,
         default=10000,
         help= """The amount of best words to store. This will become the filterable list of informative words that the best_word_feats extractor uses."""
     )
