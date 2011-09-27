@@ -60,8 +60,7 @@ def get_samples(limit=get_sample_limit(), offset=0):
     db = db_init()
     cursor = db.cursor()
 
-    sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ?"
-    sql_with_offset = "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ? OFFSET ?"
+    sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ? OFFSET ?"
 
     if limit < 2: limit = 2
 
@@ -70,22 +69,15 @@ def get_samples(limit=get_sample_limit(), offset=0):
 
     if not limit % 2 == 0:
         limit -= 1 #we want an even number
+    
+    limit = limit / 2 
+    offset = offset / 2
 
-    if offset > 0:
+    cursor.execute(sql, ["negative", limit, offset])
+    neg_samples = cursor.fetchall()
 
-        cursor.execute(sql_with_offset, ["negative", limit,offset])
-        neg_samples = cursor.fetchall()
-
-        cursor.execute(sql_with_offset, ["positive", limit,offset])
-        pos_samples = cursor.fetchall()
-
-    else:
-
-        cursor.execute(sql, ["negative", limit,])
-        neg_samples = cursor.fetchall()
-
-        cursor.execute(sql, ["positive", limit,])
-        pos_samples = cursor.fetchall()
+    cursor.execute(sql, ["positive", limit, offset])
+    pos_samples = cursor.fetchall()
 
 
     return pos_samples + neg_samples
