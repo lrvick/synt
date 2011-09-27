@@ -105,7 +105,7 @@ def main():
     if args.parser == 'train':
         train(
             train_samples=args.train_samples,
-            wordcount_samples=args.wc_samples,
+            word_count_samples=args.wc_samples,
             wordcount_range=args.wc_range,
             bestwords_to_store=args.bestwords_store,
             verbose=args.verbose,
@@ -121,7 +121,7 @@ def main():
 
     if args.parser == 'guess':
         text = args.text.strip()
-        print(guess(text=text))
+        guess(text=text)
 
     if args.parser == 'test':
         if args.samples:

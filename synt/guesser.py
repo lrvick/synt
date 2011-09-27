@@ -2,6 +2,9 @@
 from synt.utils.redis_manager import RedisManager
 from synt.utils.extractors import best_word_feats
 from synt.utils.text import sanitize_text
+from synt.logger import create_logger
+
+logger = create_logger(__file__)
 
 DEFAULT_CLASSIFIER = RedisManager().load_classifier()
 
@@ -13,9 +16,11 @@ def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats):
     classifier      -- the classifier to use  (Note: for now we only have a naivebayes classifier)
     feat_ex         -- the feature extractor to use i.e bigram_word_feats, stopword_feats, found in extractors
     """
-
-    assert classifier, "Needs a classifier."
     
+    if not classifier:
+        logger.error("guess needs a classifier")
+        return
+
     tokens = sanitize_text(text)
     
     bag_of_words = feat_ex(tokens)

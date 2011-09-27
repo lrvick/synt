@@ -5,6 +5,9 @@ from synt.utils.redis_manager import RedisManager
 from synt.utils.text import sanitize_text
 from synt.utils.extractors import best_word_feats
 from synt.guesser import guess
+from synt.logger import create_logger
+
+logger = create_logger(__file__)
 
 def test(test_samples=200000, feat_ex=best_word_feats):
     """
@@ -20,14 +23,14 @@ def test(test_samples=200000, feat_ex=best_word_feats):
     classifier = RedisManager().load_classifier()
     
     if not classifier:
-        print("There is not classifier in Redis yet, have you trained?")
+        logger.error("test needs a classifier")
         return
 
     results = []
     nltk_testing_dicts = []
     accurate_samples = 0
     
-    print("Preparing %s Testing Samples" % test_samples)
+    logger.info("Preparing %s Testing Samples" % test_samples)
     samples = get_samples(test_samples)
     
     for sample in samples:
@@ -57,19 +60,18 @@ def test(test_samples=200000, feat_ex=best_word_feats):
         results.append((accurate, sentiment, guessed, text))
     
     for result in results:
-        print ("Text: %s" % (result[3]))
-        print ("Accuracy: %s | Known Sentiment: %s | Guessed Sentiment: %s " % (result[0], result[1], result[2]))
-        print ("------------------------------------------------------------------------------------------------------------------------------------------")
+        
+        logger.info("Test: %s | Accuracy: %s | Known Sentiment: %s | Guessed Sentiment: %s " %  
+                (result[3], result[0], result[1], result[2]))
         
         if result[0] == True:
             accurate_samples += 1
        
-
         total_accuracy = (accurate_samples * 100.00 / len(samples)) 
     
     classifier.show_most_informative_features(30)
-    print("\n\rManual classifier accuracy result: %s%%" % total_accuracy)
-    print("\n\rNLTK classifier accuracy result: %.2f%%" % nltk_accuracy)
+    logger.info("Manual classifier accuracy result: %s%%" % total_accuracy)
+    logger.info("NLTK classifier accuracy result: %.2f%%" % nltk_accuracy)
 
 
 if __name__ == "__main__":
