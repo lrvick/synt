@@ -79,7 +79,8 @@ def main():
     #guess command
     parser_guess = subparsers.add_parser(
         'guess',
-        description="Guess' sentiment. This relies on a trained classifier to exist in the database which means you should run 'train' before attempting to guess. The output is a float between -1 and 1 detailing how negative or positive the sentiment is. Anything close to 0 should be treated as relativley neutral.",
+        description="Guess sentiment from given text. This relies on a trained classifier to exist in the database which means you should run 'train' before attempting to guess. The output is a float between -1 and 1 detailing how negative or positive the sentiment is. Anything close to 0 should be treated as relativley neutral.",
+        help="Guess sentiment from the command line."
     )
     parser_guess.add_argument(
             'text',
@@ -90,7 +91,8 @@ def main():
     #tester commmand
     parser_tester = subparsers.add_parser(
         'test',
-        description = """Runs the tester test function to test accuracy. You can provide a number of samples by --samples [num]""" 
+        description = """Runs the tester test function to test accuracy. You can provide a number of samples by --samples [num]""", 
+        help = "Test classifier accuracy."
     )
     
     parser_tester.add_argument(
