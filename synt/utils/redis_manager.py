@@ -7,6 +7,9 @@ import cPickle as pickle
 from nltk.probability import FreqDist, ConditionalFreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
+from synt.logger import create_logger
+
+logger = create_logger(__file__)
 
 class RedisManager(object):
 
@@ -52,26 +55,64 @@ class RedisManager(object):
         self.r.set('label_fd', pickle.dumps(label_word_freqdist))
         
 
-    def store_word_counts(self, wordcount_samples=300000):
+    def store_word_counts(self, wordcount_samples=300000, workers=None):
         """
         Stores word:count histograms for samples in Redis with the ability to increment.
+       
+        If workers is provided we will try to make this an asyncrhonous operation utilizing
+        eventlet. This means that eventlet is also a requirement. The samples / workers
+        will then be used to split the worker load.
+
         """
 
         if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
             return
+        
+        try:
+            import eventlet
+            has_eventlet = True
+        except ImportError:
+            has_eventlet = False
+        
         from synt.utils.db import get_samples
-       
-        samples = get_samples(wordcount_samples)
-        assert samples, "Samples must be provided."
+      
+        def c(samples, q=None):
+            for text, label in samples:
+                label = label + '_wordcounts'
+                tokens = sanitize_text(text)
 
-        for text, label in samples:
-            label = label + '_wordcounts'
-            tokens = sanitize_text(text)
+                if tokens:
+                    for word in tokens:
+                        prev_score = self.r.zscore(label, word)
+                        self.r.zadd(label, word, 1 if not prev_score else prev_score + 1)
 
-            if tokens:
-                for word in tokens:
-                    prev_score = self.r.zscore(label, word)
-                    self.r.zadd(label, word, 1 if not prev_score else prev_score + 1)
+                    if q: q.put("Finished %d samples" % len(samples))
+
+        if workers and has_eventlet:
+            
+            queue = eventlet.Queue()
+            worker_load = int(wordcount_samples / workers)
+            
+            offset = 0
+            
+            for i in range(1, workers + 1):
+                
+                samples = get_samples(worker_load, offset=offset)
+
+                eventlet.spawn(c, samples, queue)
+                
+                offset += worker_load 
+
+            count = 0
+            while count != workers:
+                logger.info(queue.get())
+                count += 1
+
+        else: #we don't have eventlet
+
+            samples = get_samples(wordcount_samples)
+  
+            c(samples)
 
     def store_word_scores(self):
         """
