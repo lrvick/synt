@@ -5,9 +5,12 @@ from synt.utils.extractors import best_word_feats
 from synt.utils.db import get_samples
 from synt.utils.text import sanitize_text
 from synt.logger import create_logger
+import time
+
+logger = create_logger(__file__)
 
 def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=200000, \
-    wordcount_range=150000,  bestwords_to_store=10000, force_update=False, verbose=True):
+    word_count_range=150000,  bestwords_to_store=10000, processes=8, force_update=False, verbose=True):
     """
     Trains a Naive Bayes classifier with samples from database and stores the 
     resulting classifier in Redis.
@@ -16,19 +19,21 @@ def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=2000
     #TODO: Currently this works and is tested only with best_word_feats but this should 
     #eventually work with various extractors.
     
-    featx             -- the feature extractor to use, found in utils/extractors.py. 
+    feat_ex             -- the feature extractor to use, found in utils/extractors.py. 
 
     Keyword arguments:
-    train_samples     -- the amount of samples to train half this number will be negative the other positive 
-    wordcount_samples -- the amount of samples to build wordcounts, this produces a word:count histogram in Redis 
-    wordcount_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
+    train_samples      -- the amount of samples to train half this number will be negative the other positive 
+    word_count_samples -- the amount of samples to build word_counts, this produces a word:count histogram in Redis 
+    word_count_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
                          'popular' words up to this amount. i.e top 150000 tokens 
-    bestwords_to_store-- the amount of of words we will use in our 'best_words' list to filter by  
-    force_update      -- if True will drop the Redis DB and assume a new train 
-    verbose           -- if True will output to console
+    bestwords_to_store -- the amount of of words we will use in our 'best_words' list to filter by  
+    processes          -- will be used for multiprocessing, it essentially translates to cpus
+    force_update       -- if True will drop the Redis DB and assume a new train 
+    verbose            -- if True will output to console
     """
-    
-    logger = create_logger(__file__)
+   
+    now = time.time()
+
     if not verbose: #no output
         logger.setLevel(0)
 
@@ -38,54 +43,42 @@ def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=2000
         logger.info("Trained classifier exists in Redis.")
         return
 
-    logger.info('Storing %d word counts.' % word_count_samples)
-    man.store_word_counts(word_count_samples)
+    logger.info('Storing %d feature samples.' % word_count_samples)
+    man.store_word_counts(word_count_samples, processes=processes)
+
+    logger.info('Build frequency distributions with %d features.' % word_count_range)
+    man.build_freqdists(word_count_range)
     
-    logger.info('Build frequency distributions with %d words.' % wordcount_range)
-    man.build_freqdists(wordcount_range)
-    
-    logger.info('Storing word scores.')
+    logger.info('Storing feature scores.')
     man.store_word_scores()
     
-    logger.info('Storing "best" words.')
+    logger.info('Storing %d most informative features.' % bestwords_to_store)
     man.store_best_words(bestwords_to_store)
 
     samples = get_samples(train_samples)
 
-    half = len(samples) / 2
-    
-    pos_samples = samples[:half]
-    neg_samples = samples[half:]
-   
-    logger.info('Building negfeats and posfeats')
-    negfeats, posfeats = [], []
+    best_words = man.get_best_words()
+    features = []
 
-    for text, sent in neg_samples:
+    logger.info('Building feature set with %d samples.' % train_samples)
+    for text, label in samples:
         s_text = sanitize_text(text)
-        tokens = feat_ex(s_text)
-        
-        if tokens:
-            negfeats.append((tokens,sent))
-    
-    for text, sent in pos_samples:
-        s_text = sanitize_text(text)
-        tokens = feat_ex(s_text) 
-        
-        if tokens:
-            posfeats.append((tokens,sent))
+        tokens = feat_ex(s_text, best_words=best_words)
 
-    logger.info('Built negfeats and pos feats.')
-    if not (negfeats or posfeats):
-        logger.error( "Could not build positive and negative features.")
+        if tokens: features.append((tokens, label))
+    
+    if not features:
+        logger.error( "Could not produce feature set.")
         return
 
-    negcutoff = len(negfeats)*3/4 # 3/4 training set
-    poscutoff = len(posfeats)*3/4 
+    logger.info('Built featureset.')
+    
+    cutoff = int(len(features) * .8)  
 
-    trainfeats = negfeats[:negcutoff] + posfeats[:poscutoff]
-    testfeats  = negfeats[negcutoff:] + posfeats[poscutoff:]
+    trainfeats = features[:cutoff]
+    testfeats = features[cutoff:]
+
     logger.info('Train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats)))
-
     classifier = NaiveBayesClassifier.train(trainfeats)
     logger.info('Done training')
     
@@ -94,6 +87,7 @@ def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=2000
 
     logger.info('Classifier Accuracy: %s' % util.accuracy(classifier, testfeats))
 
+    logger.info("Finished in: %s seconds." % (time.time() - now,))
 
 #References: http://streamhacker.com/
 #            http://text-processing.com/
@@ -143,13 +137,15 @@ def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=2000
 
 if __name__ == "__main__":
     #example train and tester.test to display accuracies
+    from tester import test
+    
     train(
-        train_samples=2000,
-        wordcount_samples=1000,
-        wordcount_range=2000,
-        force_update=False,
+        train_samples=50000,
+        word_count_samples=20000,
+        word_count_range=15000,
+        bestwords_to_store = 5000,
+        force_update=True,
         verbose=True
     )
-    from tester import test
+    
     test()
-
