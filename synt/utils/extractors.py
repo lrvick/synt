@@ -27,13 +27,14 @@ def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withsto
     bigrams = bigram_finder.nbest(score_fn, n)
     return dict([(ngram, True) for ngram in itertools.chain(words, bigrams)])
 
-def best_word_feats(words):
+def best_word_feats(words, best_words=None):
     """Word feats with best words."""
     
-    best_words = RedisManager().get_best_words()
     if not best_words:
         raise ValueError("This extractor relies on best_words to be stored in Redis, make sure you have trained first.")
+    
     if not words: return
+    
     return dict([(word, True) for word in words if word in best_words])
 
 def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
