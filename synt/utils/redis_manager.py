@@ -8,8 +8,31 @@ from nltk.probability import FreqDist, ConditionalFreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
 from synt.logger import create_logger
+import multiprocessing
 
 logger = create_logger(__file__)
+
+def _c(samples):
+    """
+    Stores counts to redis via a pipeline.
+    """
+    
+    man = RedisManager()
+   
+    pipeline = man.r.pipeline()
+    
+    for text, label in samples:
+        
+        label = label + '_wordcounts'
+        tokens = sanitize_text(text)
+
+        if tokens:
+            for word in tokens:
+                pipeline.zincrby(label, word)
+        
+    pipeline.execute()
+    logger.info('finished %d chunked samples' % len(samples))
+
 
 class RedisManager(object):
 
@@ -55,64 +78,59 @@ class RedisManager(object):
         self.r.set('label_fd', pickle.dumps(label_word_freqdist))
         
 
-    def store_word_counts(self, wordcount_samples=300000, workers=None):
+    def store_word_counts(self, wordcount_samples=300000, chunksize=10000, processes=None):
         """
         Stores word:count histograms for samples in Redis with the ability to increment.
-       
-        If workers is provided we will try to make this an asyncrhonous operation utilizing
-        eventlet. This means that eventlet is also a requirement. The samples / workers
-        will then be used to split the worker load.
-
+        
+        Keyword Arguments:
+        wordcount_samples   -- the amount of samples to use for determining feature counts
+        chunksize           -- the amount of samples to process at a time
+        processes           -- the amount of processors to run in async
+                               each process will be handed a chunksize of samples
+                               i.e:
+                               4 processes will be handed 10000 samples. If this is none 
+                               it will be set to the default cpu count of your computer.
         """
 
         if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
             return
         
-        try:
-            import eventlet
-            has_eventlet = True
-        except ImportError:
-            has_eventlet = False
-        
         from synt.utils.db import get_samples
       
-        def c(samples, q=None):
-            for text, label in samples:
-                label = label + '_wordcounts'
-                tokens = sanitize_text(text)
+        if not processes:
+            processes = multiprocessing.cpu_count()
+       
+        offset = 0
 
-                if tokens:
-                    for word in tokens:
-                        prev_score = self.r.zscore(label, word)
-                        self.r.zadd(label, word, 1 if not prev_score else prev_score + 1)
+        while offset != wordcount_samples:
+           
+            pool = multiprocessing.Pool(processes)
+            logger.info("Spawning %d processes." % processes)
 
-                    if q: q.put("Finished %d samples" % len(samples))
-
-        if workers and has_eventlet:
-            
-            queue = eventlet.Queue()
-            worker_load = int(wordcount_samples / workers)
-            
-            offset = 0
-            
-            for i in range(1, workers + 1):
+            for i in range(1, processes + 1): #for each process
                 
-                samples = get_samples(worker_load, offset=offset)
+                if offset >= wordcount_samples: 
+                    #if our offset has reached the sample count, break out
+                    break
+              
+                if offset + chunksize > wordcount_samples:
+                    #if our offset and chunksize is greater than samples we have
+                    #subtract samples and offset to get our remainder.
+                    #ex:
+                    # offset = 900, chunksize = 300, samples = 1000
+                    # offset + chunksize = 1200 (greater)
+                    # samples - offset = 100 remainder
+                    chunksize = wordcount_samples - offset
 
-                eventlet.spawn(c, samples, queue)
-                
-                offset += worker_load 
+                samples = get_samples(chunksize, offset=offset)
 
-            count = 0
-            while count != workers:
-                logger.info(queue.get())
-                count += 1
+                pool.apply_async(_c, [samples,]) #give chunks to workers
+   
+                offset += chunksize 
 
-        else: #we don't have eventlet
+            pool.close()
+            pool.join() #wait for workers to finish
 
-            samples = get_samples(wordcount_samples)
-  
-            c(samples)
 
     def store_word_scores(self):
         """
@@ -132,11 +150,12 @@ class RedisManager(object):
         total_word_count = pos_word_count + neg_word_count
 
         for word, freq in word_freqdist.iteritems():
+
             pos_score = BigramAssocMeasures.chi_sq(label_word_freqdist['pos'][word], (freq, pos_word_count), total_word_count)
 
             neg_score = BigramAssocMeasures.chi_sq(label_word_freqdist['neg'][word], (freq, neg_word_count), total_word_count)
 
-            word_scores[word] = pos_score + neg_score
+            word_scores[word] = pos_score + neg_score 
         
         self.r.set('word_scores', word_scores)
 
@@ -185,6 +204,11 @@ class RedisManager(object):
             best_words =  ast.literal_eval(self.r.get('best_words'))
 
             if not scores:
-                best_words = [w[0] for w in best_words]
+                #in case of no scores we don't care about order
+                tmp = {}
+                for w in best_words:
+                    tmp.setdefault(w[0], None)
+                best_words = tmp 
+                #best_words = [w[0] for w in best_words]
 
             return best_words
