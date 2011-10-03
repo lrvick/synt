@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from nltk import NaiveBayesClassifier
 from utils.redis_manager import RedisManager
 from synt.utils.extractors import best_word_feats
 from synt.utils.db import get_samples
@@ -134,12 +135,10 @@ if __name__ == "__main__":
     from tester import test
     
     train(
-        train_samples=50000,
-        word_count_samples=20000,
-        word_count_range=15000,
-        bestwords_to_store = 5000,
+        train_samples=100000,
+        word_count_samples=70000,
+        word_count_range=25000,
+        bestwords_to_store = 10000,
         force_update=True,
         verbose=True
     )
-    
-    test()
