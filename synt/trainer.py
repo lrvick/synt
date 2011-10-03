@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from nltk.classify import NaiveBayesClassifier, util
 from utils.redis_manager import RedisManager
 from synt.utils.extractors import best_word_feats
 from synt.utils.db import get_samples
@@ -60,34 +59,27 @@ def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=2000
     samples = get_samples(train_samples)
 
     best_words = man.get_best_words()
-    features = []
+    trainfeats = []
 
     logger.info('Building feature set with %d samples.' % train_samples)
     for text, label in samples:
         s_text = sanitize_text(text)
         tokens = feat_ex(s_text, best_words=best_words)
 
-        if tokens: features.append((tokens, label))
+        if tokens: trainfeats.append((tokens, label))
     
-    if not features:
-        logger.error( "Could not produce feature set.")
+    if not trainfeats:
+        logger.error( "Could not produce a training feature set.")
         return
 
-    logger.info('Built featureset.')
+    logger.info('Built feature set.')
     
-    cutoff = int(len(features) * .8)  
-
-    trainfeats = features[:cutoff]
-    testfeats = features[cutoff:]
-
-    logger.info('Train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats)))
+    logger.info('Train on %d instances' % len(trainfeats))
     classifier = NaiveBayesClassifier.train(trainfeats)
     logger.info('Done training')
     
     man.store_classifier(classifier)
     logger.info('Stored to Redis')
-
-    logger.info('Classifier Accuracy: %s' % util.accuracy(classifier, testfeats))
 
     logger.info("Finished in: %s seconds." % (time.time() - now,))
 
