@@ -38,6 +38,8 @@ def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=2000
         logger.setLevel(0)
 
     man = RedisManager(force_update=force_update)
+    
+    man.r.set('training_sample_count', train_samples) #set this for testing offsets later
 
     if 'classifier' in man.r.keys():
         logger.info("Trained classifier exists in Redis.")

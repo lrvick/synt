@@ -9,18 +9,19 @@ from synt.logger import create_logger
 
 logger = create_logger(__file__)
 
-def test(test_samples=200000, feat_ex=best_word_feats):
+def test(test_samples=50000, feat_ex=best_word_feats):
     """
     This first returns the accuracy of the classifier then proceeds
     to test across known sentiments and produces a 'manual accuracy score'.
     
     Keyword Arguments:
     test_samples    -- the amount of samples to test against
-    feat_ext        -- the feature extractor to use (utils/extractors)
+    feat_ex         -- the feature extractor to use (utils/extractors)
     
     """
 
-    classifier = RedisManager().load_classifier()
+    man = RedisManager()
+    classifier = man.load_classifier()
     
     if not classifier:
         logger.error("test needs a classifier")
@@ -30,8 +31,12 @@ def test(test_samples=200000, feat_ex=best_word_feats):
     nltk_testing_dicts = []
     accurate_samples = 0
     
-    logger.info("Preparing %s Testing Samples" % test_samples)
-    samples = get_samples(test_samples)
+    logger.info("Preparing %s testing Samples" % test_samples)
+    
+    offset = man.r.get('training_sample_count')
+    if not offset: offset = 0
+
+    samples = get_samples(test_samples, offset=offset) #ensure we are using new testing samples
     
     for sample in samples:
         
@@ -39,7 +44,7 @@ def test(test_samples=200000, feat_ex=best_word_feats):
         tokens = sanitize_text(text)
         
         if tokens:
-            feats = feat_ex(tokens)
+            feats = feat_ex(tokens, best_words=man.get_best_words())
             
             nltk_testing_dicts.append((feats, sentiment))
 
