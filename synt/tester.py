@@ -9,7 +9,7 @@ from synt.logger import create_logger
 
 logger = create_logger(__file__)
 
-def test(test_samples=50000, feat_ex=best_word_feats):
+def test(test_samples=50000, feat_ex=best_word_feats, neutral_zone=0):
     """
     This first returns the accuracy of the classifier then proceeds
     to test across known sentiments and produces a 'manual accuracy score'.
@@ -17,7 +17,13 @@ def test(test_samples=50000, feat_ex=best_word_feats):
     Keyword Arguments:
     test_samples    -- the amount of samples to test against
     feat_ex         -- the feature extractor to use (utils/extractors)
-    
+    neutral_zone    -- will be used to drop "neutrals" to see how real-world accuracy will look.
+                       In other words, in the case of neutral zone being 0.2 if the word
+                       guessed is not greater than 0.2 or less than -0.2 it is considered inaccurate.
+                       Leaving this set to 0 will always force the classifier
+                       to provide a positive or negaitve return even if it is unmeaningful
+                       i.e a score of 0.00001 is still positive but the classifier is 
+                       more than likely uncertain about it.
     """
 
     man = RedisManager()
@@ -28,41 +34,38 @@ def test(test_samples=50000, feat_ex=best_word_feats):
         return
 
     results = []
-    nltk_testing_dicts = []
+    testfeats = []
     accurate_samples = 0
     
     logger.info("Preparing %s testing Samples" % test_samples)
     
-    offset = man.r.get('training_sample_count')
+    offset = int(man.r.get('training_sample_count'))
     if not offset: offset = 0
 
     samples = get_samples(test_samples, offset=offset) #ensure we are using new testing samples
-    
-    for sample in samples:
-        
-        text, sentiment = sample[0], sample[1] #(text, sentiment)
-        tokens = sanitize_text(text)
-        
-        if tokens:
-            feats = feat_ex(tokens, best_words=man.get_best_words())
-            
-            nltk_testing_dicts.append((feats, sentiment))
+   
+    best_words = man.get_best_words()
+    for text, label in samples:
+        s_text = sanitize_text(text) 
+        tokens = feat_ex(s_text, best_words=best_words)
 
-    nltk_accuracy = nltk.classify.util.accuracy(classifier, nltk_testing_dicts)  * 100 # percentify
+        if tokens:
+            testfeats.append((tokens, label))
+
+    nltk_accuracy = nltk.classify.util.accuracy(classifier, testfeats)  * 100 # percentify
     
-    for sample in samples:
-        text, sentiment = sample[0], sample[1] #(text, sentiment)
-        guessed = guess(text)
+    for text, label in samples:
+        guessed = guess(text, best_words=best_words)
        
-        if sentiment.startswith('pos') and guessed > 0:
+        if label.startswith('pos') and guessed > neutral_zone: 
             accurate = True
-        elif sentiment.startswith('neg') and guessed < 0:
+        elif label.startswith('neg') and guessed < -neutral_zone:
             accurate = True
         else:
             accurate = False
             
         
-        results.append((accurate, sentiment, guessed, text))
+        results.append((accurate, label, guessed, text))
     
     for result in results:
         
@@ -80,5 +83,5 @@ def test(test_samples=50000, feat_ex=best_word_feats):
 
 
 if __name__ == "__main__":
-    #example test on 100 samples
-    test(100)
+    #example test on 1000 samples
+    test(50000, neutral_zone=0.3)
