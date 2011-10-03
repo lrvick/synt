@@ -8,7 +8,8 @@ logger = create_logger(__file__)
 
 DEFAULT_CLASSIFIER = RedisManager().load_classifier()
 
-def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats):
+
+def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats, best_words=None):
     """
     Takes a blob of text and returns the sentiment score (-1.0 - 1.0).
     
@@ -22,8 +23,8 @@ def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats):
         return
 
     tokens = sanitize_text(text)
-    
-    bag_of_words = feat_ex(tokens)
+   
+    bag_of_words = feat_ex(tokens, best_words=best_words)
    
     score = 0.0
     
