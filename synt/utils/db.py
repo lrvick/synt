@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Functions that interact with or initial the database."""
+"""Functions to interact with the database."""
 import os
 import sqlite3
 from synt import settings
@@ -78,6 +78,5 @@ def get_samples(limit=get_sample_limit(), offset=0):
 
     cursor.execute(sql, ["positive", limit, offset])
     pos_samples = cursor.fetchall()
-
 
     return pos_samples + neg_samples
