@@ -8,7 +8,9 @@ from nltk.probability import FreqDist, ConditionalFreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
 from synt.logger import create_logger
-import multiprocessing
+from synt.utils.processing import batch_job
+
+
 
 logger = create_logger(__file__)
 
@@ -31,7 +33,6 @@ def _c(samples):
                 pipeline.zincrby(label, word)
         
     pipeline.execute()
-    logger.info('finished %d chunked samples' % len(samples))
 
 
 class RedisManager(object):
@@ -97,39 +98,17 @@ class RedisManager(object):
         
         from synt.utils.db import get_samples
       
-        if not processes:
-            processes = multiprocessing.cpu_count()
        
-        offset = 0
-
-        while offset != wordcount_samples:
-           
-            pool = multiprocessing.Pool(processes)
-            logger.info("Spawning %d processes." % processes)
-
-            for i in range(1, processes + 1): #for each process
+        logger.info("Spawning %d processes with %d chunksize." % (processes, chunksize))
+        
+        def producer(offset,length):
+            if offset+length > wordcount_samples:
+                length = wordcount_samples-offset
+            if length < 1:
+                return []
+            return get_samples(length,offset=offset)
                 
-                if offset >= wordcount_samples: 
-                    #if our offset has reached the sample count, break out
-                    break
-              
-                if offset + chunksize > wordcount_samples:
-                    #if our offset and chunksize is greater than samples we have
-                    #subtract samples and offset to get our remainder.
-                    #ex:
-                    # offset = 900, chunksize = 300, samples = 1000
-                    # offset + chunksize = 1200 (greater)
-                    # samples - offset = 100 remainder
-                    chunksize = wordcount_samples - offset
-
-                samples = get_samples(chunksize, offset=offset)
-
-                pool.apply_async(_c, [samples,]) #give chunks to workers
-   
-                offset += chunksize 
-
-            pool.close()
-            pool.join() #wait for workers to finish
+        batch_job(producer, _c, chunksize )
 
 
     def store_word_scores(self):
