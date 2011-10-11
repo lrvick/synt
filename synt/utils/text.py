@@ -13,14 +13,14 @@ def sanitize_text(text):
     """
     Formats text to strip unneccesary:words, punctuation and whitespace. Returns a tokenized list.
    
-    >>> text = "ommmmmmg how'r u!? visi t  <html> <a href='http://google.com'> my</a> site @ http://www.coolstuff.com"
+    >>> text = "ommmmmmg how'r u!? visi t  <html> <a href='http://google.com'> my</a> site @ http://www.coolstuff.com haha"
     >>> sanitize_text(text)
-    [u'ommg', u'howr', u'visi', u'my', u'site', u'httpwwcoolstuffcom']
+    [u'ommg', u'howr', u'visi', u'my', u'site', u'haha']
     
-    >>> sanitize_text("FOE JAPANが粘り強く主張していた避難の権利")
-    [u'foe', u'japan\u304c\u7c98\u308a\u5f37\u304f\u4e3b\u5f35\u3057\u3066\u3044\u305f\u907f\u96e3\u306e\u6a29\u5229']
+    >>> sanitize_text("FOE JAPAN が粘り強く主張していた避難の権利")
+    [u'foe', u'japan', u'\u304c\u7c98\u308a\u5f37\u304f\u4e3b\u5f35\u3057\u3066\u3044\u305f\u907f\u96e3\u306e\u6a29\u5229']
     
-    >>> sanitize_text('no')
+    >>> sanitize_text('no ')
     [u'no']
     
     >>> sanitize_text('')
@@ -44,6 +44,7 @@ def sanitize_text(text):
         ("#[A-Za-z0-9_]+", ''), # ""
         ("(\w)\\1{2,}", "\\1\\1"), #remove occurences of more than two consecutive repeating characters
         ("<[^<]+?>", ''), #remove html tags
+        ("(http|www)[^ ]*", ''),     
     )
     
     for pat in format_pats:
@@ -51,7 +52,8 @@ def sanitize_text(text):
    
     if text:
         text = text.translate(PUNC_MAP) #strip punctuation
-    
+        
+        #tokenize on words longer than 1 char
         words = [w for w in WhitespaceTokenizer().tokenize(text) if len(w) > 1]
     
         return words
