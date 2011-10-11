@@ -14,3 +14,9 @@
   * Github    : <http://github.com/tsoporan>
   * LinkedIn  : <http://linkedin.com/in/tsoporan>
 
+## Steven VanHorn ##
+  * Email     : <theepicsnail@gmail.com>
+  * Web       : <http://theepicsnail.net>
+  * Twitter   : <http://twitter.com/theepicsnail>
+  * Github    : <http://github.com/theepicsnail>
+  * LinkedIn  : <http://linkedin.com/in/theepicsnail>
