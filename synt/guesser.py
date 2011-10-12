@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from synt.utils.redis_manager import RedisManager
-from synt.utils.extractors import best_word_feats
+from synt.utils.extractors import WordExtractor, BestWordExtractor
 from synt.utils.text import sanitize_text
 from synt.logger import create_logger
 
@@ -8,14 +8,13 @@ logger = create_logger(__file__)
 
 DEFAULT_CLASSIFIER = RedisManager().load_classifier()
 
-
-def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats, best_words=None):
+def guess(text, classifier=DEFAULT_CLASSIFIER, extractor=WordExtractor()):
     """
     Takes a blob of text and returns the sentiment score (-1.0 - 1.0).
     
     Keyword Arguments:
-    classifier      -- the classifier to use  (Note: for now we only have a naivebayes classifier)
-    feat_ex         -- the feature extractor to use i.e bigram_word_feats, stopword_feats, found in extractors
+    classifier      -- the classifier to use 
+    extractor       -- the feature extractor to use utils.extractors
     """
     
     if not classifier:
@@ -23,8 +22,8 @@ def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats, best_wor
         return
 
     tokens = sanitize_text(text)
-   
-    bag_of_words = feat_ex(tokens, best_words=best_words)
+  
+    bag_of_words = extractor.extract(tokens)
    
     score = 0.0
     
@@ -36,9 +35,19 @@ def guess(text, classifier=DEFAULT_CLASSIFIER, feat_ex=best_word_feats, best_wor
         score = prob.prob('positive') - prob.prob('negative')
        
         #if score doesn't fall within -1 and 1 return 0.0 
-        #example: single words might return a heavily biased score like -9.8343
         if not (-1 <= score <= 1):
             pass #score 0.0
 
     return score
 
+if __name__ == '__main__':
+    #example guess
+    print("Enter something to calucluate the synt of it!")
+    print("Just press enter to quit.")
+    
+    running = True
+    while running:
+        text = raw_input("synt> ")
+        if not text:
+            break    
+        print('Guessed: {}'.format(guess(text)))
