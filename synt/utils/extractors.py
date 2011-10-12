@@ -7,6 +7,9 @@ from synt.utils.redis_manager import RedisManager
 class WordExtractor(object):
     
     def extract(self, words):
+            
+        if not words: return
+
         return dict([(word, True) for word in words])
 
 class StopWordExtractor(WordExtractor):
@@ -19,6 +22,8 @@ class StopWordExtractor(WordExtractor):
 
     def extract(self, words):
         assert self.stop_words, "This extractor relies on a set of stopwords."
+        
+        if not words: return
 
         return dict([(word,True) for word in words if word not in self.stop_words])
 
@@ -28,8 +33,7 @@ class BestWordExtractor(WordExtractor):
         if best_words:
             self.best_words = best_words
         else:
-            self.redis_manager = RedisManager() 
-            self.best_words = self.redis_manager.get_best_words()
+            self.best_words = RedisManager().get_best_words()
 
     def extract(self, words):
         assert self.best_words, "This extractor relies on best words."
