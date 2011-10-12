@@ -4,7 +4,7 @@ import os
 import bz2
 import urllib2
 import simplejson as json
-from sqlite import IntegrityError
+from sqlite3 import IntegrityError
 from cStringIO import StringIO
 from synt.utils.db import db_init
 from synt.logger import create_logger
