@@ -1,9 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Functions to interact with the database."""
+"""Functions to interact with databases."""
 import os
 import sqlite3
+import redis
+import cPickle as pickle
 from synt import settings
-from synt.utils.redis_manager import RedisManager
+from nltk.probability import ConditionalFreqDist
+from nltk.metrics import BigramAssocMeasures
+from synt.utils.text import sanitize_text
+from synt.utils.processing import batch_job
+from synt.logger import create_logger
+
+logger = create_logger(__file__)
 
 def db_init(create=True):
     """Initializes the sqlite3 database."""
@@ -18,6 +26,182 @@ def db_init(create=True):
     else:
         conn = sqlite3.connect(settings.DB_FILE)
     return conn
+
+
+def redis_feature_consumer(samples):
+    """
+    Stores counts to redis via a pipeline.
+    """
+    
+    m = RedisManager()
+   
+    pipeline = m.r.pipeline()
+
+    neg_processed, pos_processed = 0, 0
+
+    for text, label in samples:
+        
+        count_label = label + '_wordcounts'
+
+        tokens = sanitize_text(text)
+
+        if tokens:
+            if label.startswith('pos'):
+                pos_processed += 1
+            else:
+                neg_processed += 1
+
+            for word in set(tokens):
+                pipeline.zincrby(count_label, word)
+
+    pipeline.set('negative_processed', neg_processed) 
+    pipeline.set('positive_processed', pos_processed)
+    
+    pipeline.execute()
+
+
+class RedisManager(object):
+
+    def __init__(self, db='synt', purge=False):
+        
+        self.r = redis.Redis(db=db)
+        if purge: self.r.flushdb()
+
+
+    def store_freqdists(self):
+        """
+        Store a conditional freqdist in redis.
+        """
+
+        label_word_freqdist = ConditionalFreqDist()
+
+        pos_words = self.r.zrange('positive_wordcounts', 0, -1, withscores=True, desc=True)
+        neg_words = self.r.zrange('negative_wordcounts', 0, -1, withscores=True, desc=True)
+
+        assert pos_words and neg_words, 'Requires wordcounts to be stored in redis.'
+
+        #build a condtional freqdist with the feature counts per label
+        for word, count in pos_words:
+            label_word_freqdist['positive'][word] = count
+
+        for word,count in neg_words:
+            label_word_freqdist['negative'][word] = count
+
+        #storing for use later, these values are always computed
+        self.r.set('label_fd', pickle.dumps(label_word_freqdist))
+        
+
+    def store_feature_counts(self, samples, chunksize=10000, processes=None, incr=False):
+        """
+        Stores word:count histograms for samples in Redis with the ability to increment.
+        
+        Keyword Arguments:
+        wordcount_samples   -- the amount of samples to use for determining feature counts
+        chunksize           -- the amount of samples to process at a time
+        processes           -- the amount of processors to run in async
+                               each process will be handed a chunksize of samples
+                               i.e:
+                               4 processes will be handed 10000 samples. If this is none 
+                               it will be set to the default cpu count of your computer.
+        """
+
+        if 'positive_wordcounts' in self.r.keys() and not incr:
+            logger.info("Using cached feature counts.")
+            return
+        
+        logger.info("Spawning %d processes with %d chunksize." % (processes, chunksize))
+        
+        def producer(offset, length):
+            if offset + length > samples:
+                length = samples - offset
+            if length < 1:
+                return []
+            return get_samples(length, offset=offset)
+                
+        batch_job(producer, redis_feature_consumer, chunksize)
+        
+    def store_feature_scores(self):
+        """
+        Stores 'word scores' into Redis.
+        """
+        
+        try:
+            label_word_freqdist = pickle.loads(self.r.get('label_fd'))
+        except TypeError:
+            print('Requires frequency distributions to be built.')
+
+        word_scores = {}
+
+        pos_word_count = label_word_freqdist['positive'].N()
+        neg_word_count = label_word_freqdist['negative'].N()
+        total_word_count = pos_word_count + neg_word_count
+
+        for label in label_word_freqdist.conditions():
+
+            for word, freq in label_word_freqdist[label].iteritems():
+
+                pos_score = BigramAssocMeasures.chi_sq(label_word_freqdist['positive'][word], (freq, pos_word_count), total_word_count)
+                neg_score = BigramAssocMeasures.chi_sq(label_word_freqdist['negative'][word], (freq, neg_word_count), total_word_count)
+            
+                word_scores[word] = pos_score + neg_score 
+       
+        self.r.set('word_scores', word_scores)
+
+
+    def store_classifier(self, classifier, name='classifier'):
+        """
+        Stores a pickled a classifier into Redis.
+        """
+        dumped = pickle.dumps(classifier, protocol=1)
+        self.r.set(name, dumped)
+        
+
+    def load_classifier(self, name='classifier'):
+        """
+        Loads (unpickles) a classifier from Redis.
+        """
+        try:
+            loaded = pickle.loads(self.r.get(name))
+        except TypeError:
+            return     
+        return loaded 
+
+    def get_top_words(self, label, start=0, end=10):
+        """Return the top words for label from Redis store."""
+        if self.r.exists(label):
+            return self.r.zrange(label, start, end, withscores=True, desc=True) 
+
+    def store_best_features(self, n=10000):
+        """Store n best features to Redis."""
+        if not n: return
+
+        word_scores = ast.literal_eval(self.r.get('word_scores')) #str -> dict
+            
+        assert word_scores, "Word scores need to exist."
+        
+        best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
+        self.r.set('best_words', best)
+        
+    def get_best_words(self, scores=False):
+        """
+        Return cached best_words
+
+        If scores provided will return word/score tuple.
+        """
+        best_words = None
+        if 'best_words' in self.r.keys():
+            
+            best_words =  ast.literal_eval(self.r.get('best_words'))
+
+            if not scores:
+                #in case of no scores we don't care about order
+                tmp = {}
+                for w in best_words:
+                    tmp.setdefault(w[0], None)
+                best_words = tmp 
+                #best_words = [w[0] for w in best_words]
+
+        return best_words
 
 
 def get_sample_limit():
@@ -51,7 +235,6 @@ def get_sample_limit():
     
     return limit
 
-
 def get_samples(limit=get_sample_limit(), offset=0):
     """
     Returns a combined list of negative and positive samples.
@@ -60,7 +243,7 @@ def get_samples(limit=get_sample_limit(), offset=0):
     db = db_init()
     cursor = db.cursor()
 
-    sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ? OFFSET ?"
+    sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? ORDER BY id DESC LIMIT ? OFFSET ?"
 
     if limit < 2: limit = 2
 
@@ -80,3 +263,4 @@ def get_samples(limit=get_sample_limit(), offset=0):
     pos_samples = cursor.fetchall()
 
     return pos_samples + neg_samples
+
