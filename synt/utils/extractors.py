@@ -2,7 +2,7 @@
 """Tools for extracting features and text processing."""
 
 from nltk.corpus import stopwords
-from synt.utils.redis_manager import RedisManager
+from synt.utils.db import RedisManager
 
 class WordExtractor(object):
     
