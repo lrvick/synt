@@ -1,144 +1,97 @@
 # -*- coding: utf-8 -*-
-from nltk import NaiveBayesClassifier
-from utils.redis_manager import RedisManager
-from synt.utils.extractors import best_word_feats
-from synt.utils.db import get_samples
-from synt.utils.text import sanitize_text
+from nltk import NaiveBayesClassifier, FreqDist, ELEProbDist
+from utils.db import RedisManager
 from synt.logger import create_logger
 import time
+import cPickle as pickle
+from collections import defaultdict
 
 logger = create_logger(__file__)
 
-def train(feat_ex=best_word_feats, train_samples=400000, word_count_samples=200000, \
-    word_count_range=150000,  bestwords_to_store=10000, processes=8, force_update=False, verbose=True):
+def train(samples=200000, best_features=10000, processes=8):
     """
     Trains a Naive Bayes classifier with samples from database and stores the 
     resulting classifier in Redis.
   
-    Args:
-    #TODO: Currently this works and is tested only with best_word_feats but this should 
-    #eventually work with various extractors.
-    
-    feat_ex             -- the feature extractor to use, found in utils/extractors.py. 
-
     Keyword arguments:
-    train_samples      -- the amount of samples to train half this number will be negative the other positive 
-    word_count_samples -- the amount of samples to build word_counts, this produces a word:count histogram in Redis 
-    word_count_range   -- the amount of 'up-to' words to use for the FreqDist will pick out the most
-                         'popular' words up to this amount. i.e top 150000 tokens 
-    bestwords_to_store -- the amount of of words we will use in our 'best_words' list to filter by  
-    processes          -- will be used for multiprocessing, it essentially translates to cpus
-    force_update       -- if True will drop the Redis DB and assume a new train 
-    verbose            -- if True will output to console
+    samples         -- the amount of samples to train on
+    best_features   -- amount of highly informative features to store
+    processes       -- will be used for multiprocessing, it essentially translates to cpus
     """
    
-    now = time.time()
+    start = time.time()
 
-    if not verbose: #no output
-        logger.setLevel(0)
+    m = RedisManager()
+    m.r.set('training_sample_count', samples)
 
-    man = RedisManager(force_update=force_update)
-    
-    man.r.set('training_sample_count', train_samples) #set this for testing offsets later
-
-    if 'classifier' in man.r.keys():
-        logger.info("Trained classifier exists in Redis.")
+    if 'classifier' in m.r.keys():
+        logger.info("Trained classifier exists in Redis. Purge first to re-train.")
         return
 
-    logger.info('Storing %d feature samples.' % word_count_samples)
-    man.store_word_counts(word_count_samples, processes=processes)
+    logger.info('Storing feature counts for %d samples.' % samples)
+    m.store_feature_counts(samples, processes=processes)
 
-    logger.info('Build frequency distributions with %d features.' % word_count_range)
-    man.build_freqdists(word_count_range)
+    logger.info('Building frequency distributions from feature counts.')
+    m.store_freqdists()
     
     logger.info('Storing feature scores.')
-    man.store_word_scores()
+    m.store_feature_scores()
     
-    logger.info('Storing %d most informative features.' % bestwords_to_store)
-    man.store_best_words(bestwords_to_store)
+    if best_features:
+        logger.info('Storing %d most informative features.' % best_features)
+        m.store_best_features(best_features)
 
-    samples = get_samples(train_samples)
+    label_freqdist = FreqDist()
+    feature_freqdist = defaultdict(FreqDist)
+    feature_values = defaultdict(set)
+    fnames = set()
 
-    best_words = man.get_best_words()
-    trainfeats = []
+    neg_processed, pos_processed = m.r.get('negative_processed'), m.r.get('positive_processed')
+    label_freqdist.inc('negative', int(neg_processed))
+    label_freqdist.inc('positive', int(pos_processed))
 
-    logger.info('Building feature set with %d samples.' % train_samples)
-    for text, label in samples:
-        s_text = sanitize_text(text)
-        tokens = feat_ex(s_text, best_words=best_words)
-
-        if tokens: trainfeats.append((tokens, label))
+    conditional_fd = pickle.loads(m.r.get('label_fd'))
     
-    if not trainfeats:
-        logger.error( "Could not produce a training feature set.")
-        return
+    labels = conditional_fd.conditions()
 
-    logger.info('Built feature set.')
+    for label in labels:
+        for fname, fcount in conditional_fd[label].items():
+            feature_freqdist[label, fname].inc(True, fcount)
+            feature_values[fname].add(True)
+            fnames.add(fname)
+   
+    for label in labels:
+        num_samples = label_freqdist[label] #sample count for label 
+        for fname in fnames:
+            count = feature_freqdist[label, fname].N()
+            feature_freqdist[label, fname].inc(None, num_samples - count)
+            feature_values[fname].add(None)
+
+    # Create the P(label) distribution
+    estimator = ELEProbDist
+    label_probdist = estimator(label_freqdist)
     
-    logger.info('Train on %d instances' % len(trainfeats))
-    classifier = NaiveBayesClassifier.train(trainfeats)
-    logger.info('Done training')
+    # Create the P(fval|label, fname) distribution
+    feature_probdist = {}
+    for ((label, fname), freqdist) in feature_freqdist.items():
+        probdist = estimator(freqdist, bins=len(feature_values[fname]))
+        feature_probdist[label,fname] = probdist
     
-    man.store_classifier(classifier)
-    logger.info('Stored to Redis')
+    logger.info('Built feature probdist with %d items.' % len(feature_probdist.items()))
 
-    logger.info("Finished in: %s seconds." % (time.time() - now,))
-
-#References: http://streamhacker.com/
-#            http://text-processing.com/
-#def example_train(feat_ex):
-#    from nltk.corpus import movie_reviews
-#    import collections
-#    import nltk.metrics
-#    import cPickle as pickle
-#
-#    negids = movie_reviews.fileids('neg')
-#    posids = movie_reviews.fileids('pos')
-#
-#    negfeats = [(feat_ex(movie_reviews.words(fileids=[f])), 'neg') for f in negids]
-#    posfeats = [(feat_ex(movie_reviews.words(fileids=[f])), 'pos') for f in posids]
-#
-#    negcutoff = len(negfeats)*3/4 #3/4 training set rest testing set
-#    poscutoff = len(negfeats)*3/4
-#
-#    trainfeats = negfeats[:negcutoff] + posfeats[:poscutoff]
-#    testfeats = negfeats[negcutoff:] + posfeats[poscutoff:]
-#    print 'train on %d instances, test on %d instances' % (len(trainfeats), len(testfeats))
-#
-#    classifier = NaiveBayesClassifier.train(trainfeats)
-#
-#    refsets = collections.defaultdict(set)
-#    testsets = collections.defaultdict(set)
-#
-#    for i, (feats, label) in enumerate(testfeats):
-#        refsets[label].add(i)
-#        observed = classifier.classify(feats)
-#        testsets[observed].add(i)
-#
-#
-#    print '#### POSITIVE ####'
-#    print 'pos precision:', nltk.metrics.precision(refsets['pos'], testsets['pos'])
-#    print 'pos recall:', nltk.metrics.recall(refsets['pos'], testsets['pos'])
-#    print 'pos F-measure:', nltk.metrics.f_measure(refsets['pos'], testsets['pos'])
-#    print
-#    print '#### NEGATIVE ####'
-#    print 'neg precision:', nltk.metrics.precision(refsets['neg'], testsets['neg'])
-#    print 'neg recall:', nltk.metrics.recall(refsets['neg'], testsets['neg'])
-#    print 'neg F-measure:', nltk.metrics.f_measure(refsets['neg'], testsets['neg'])
-#
-#    print '--------------------'
-#    print 'Classifier Accuracy:', util.accuracy(classifier, testfeats)
-#    classifier.show_most_informative_features()
+    classifier = NaiveBayesClassifier(label_probdist, feature_probdist)
+    logger.info('Initialized classifier.')
+    
+    m.store_classifier(classifier)
+    logger.info('Stored classifier to Redis.')
+    
+    logger.info('Finished in: %s seconds.' % (time.time() - start))
 
 if __name__ == "__main__":
-    #example train and tester.test to display accuracies
-    from tester import test
-    
+    #example train
+
     train(
-        train_samples=100000,
-        word_count_samples=70000,
-        word_count_range=25000,
-        bestwords_to_store = 10000,
-        force_update=True,
-        verbose=True
+        samples       = 100,
+        best_features = None,
+        processes     = 8,
     )
