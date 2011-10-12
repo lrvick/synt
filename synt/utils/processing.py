@@ -3,16 +3,6 @@
 import multiprocessing
 from synt.logger import create_logger
 
-_="""
-apply       = lambda x, *a,**b:x.apply(*a,**b)
-apply_async = lambda x, *a,**b:x.apply_async(*a,**b)
-map         = lambda x, *a,**b:x.map(*a,**b)
-map_async   = lambda x, *a,**b:x.map_async(*a,**b)
-imap        = lambda x, *a,**b:x.imap(*a,**b)
-imap_unordered = lambda x,*a,**b:x.imap_unordered(*a,**b)
-"""
-
-"i don't know how well this will work? but logging support is needed"
 logger = create_logger(__file__)
 
 def batch_job(producer, consumer, chunksize=10000, processes=None):
@@ -20,12 +10,12 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
     Call consumer on everything that is produced from producer, using a pool.
 
     Args:
-    producer    -- Produces the events that are fed to the consumer.
-    consumer    -- The function called with values recieved from the producer
+    producer    -- produces the events that are fed to the consumer.
+    consumer    -- the function called with values recieved from the producer
 
     Keyword Arguments:
-    chunksize   -- How many values to request from the producer
-    processes   -- How many processes should be created to handle jobs
+    chunksize   -- how many values to request from the producer
+    processes   -- how many processes should be created to handle jobs
     """
 
     if type(producer) in [list,tuple]:
@@ -49,7 +39,7 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
     finished = False
     
     pool = multiprocessing.Pool(processes)
-    
+   
     while not finished:
         
         for i in range(1, processes + 1):
@@ -62,16 +52,15 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
                 logger.info("Producer returned False/empty list. Quitting.")
                 break
             
-            pool.apply_async(consumer, [samples, ])
+            pool.apply_async(consumer, [samples])
             
+
             offset += len(samples)
     
     logger.info("Waiting for pools to clear.")
     pool.close() 
     pool.join() #wait for workers to finish
     logger.info("Last pool finished.")
-
-
 
 if __name__=="__main__":
     import time
