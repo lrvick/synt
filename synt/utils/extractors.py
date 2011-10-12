@@ -2,48 +2,38 @@
 """Tools for extracting features and text processing."""
 
 from nltk.corpus import stopwords
-from nltk.collocations import BigramCollocationFinder
-from nltk.metrics import BigramAssocMeasures
-
 from synt.utils.redis_manager import RedisManager
-import itertools
 
-def word_feats(words):
-    """Basic word features, simple bag of words model"""
-
-    return dict([(word, True) for word in words])
-
-def stopword_word_feats(words):
-    """Word features with stopwords"""
-
-    stopset = set(stopwords.words('english'))
-    return dict([(word,True) for word in words if word not in stopset])
-
-def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200, withstopwords=True):
-    """Word features with bigrams"""
+class WordExtractor(object):
     
-    if not words: return
-    bigram_finder = BigramCollocationFinder.from_words(words)
-    bigrams = bigram_finder.nbest(score_fn, n)
-    return dict([(ngram, True) for ngram in itertools.chain(words, bigrams)])
+    def extract(self, words):
+        return dict([(word, True) for word in words])
 
-def best_word_feats(words, best_words=None):
-    """Word feats with best words."""
+class StopWordExtractor(WordExtractor):
     
-    if not best_words:
-        raise ValueError("This extractor relies on best_words to be stored in Redis, make sure you have trained first.")
-    
-    if not words: return
-    
-    return dict([(word, True) for word in words if word in best_words])
+    def __init__(self, stop_words=None):
+        if stop_words:
+            self.stop_words = stop_words
+        else:
+            self.stop_words = set(stopwords.words('english'))
 
-def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
-    """Word features with bigrams and best words."""
+    def extract(self, words):
+        assert self.stop_words, "This extractor relies on a set of stopwords."
+
+        return dict([(word,True) for word in words if word not in self.stop_words])
+
+class BestWordExtractor(WordExtractor):
     
-    if not words: return
-    bigram_finder = BigramCollocationFinder.from_words(words)
-    bigrams = bigram_finder.nbest(score_fn, n)
-    
-    d = dict([(bigram, True) for bigram in bigrams])
-    d.update(best_word_feats(words))
-    return d
+    def __init__(self, best_words=None):
+        if best_words:
+            self.best_words = best_words
+        else:
+            self.redis_manager = RedisManager() 
+            self.best_words = self.redis_manager.get_best_words()
+
+    def extract(self, words):
+        assert self.best_words, "This extractor relies on best words."
+        
+        if not words: return
+        
+        return dict([(word, True) for word in words if word in self.best_words])
