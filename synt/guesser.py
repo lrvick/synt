@@ -2,16 +2,11 @@
 from synt.utils.db import RedisManager
 from synt.utils.extractors import WordExtractor, BestWordExtractor
 from synt.utils.text import sanitize_text
-from synt.logger import create_logger
 
-logger = create_logger(__file__)
 
 class Guesser(object):
     
     def __init__(self, classifier='naivebayes', extractor=WordExtractor):
-        """
-        Initializes Guesser with defaults NaiveBayes classifier and WordExtractor extractor.
-        """
         
         self.classifier = RedisManager().load_classifier(classifier) 
         self.extractor = extractor()
@@ -23,7 +18,7 @@ class Guesser(object):
         """
         
         if not self.classifier:
-            logger.error("guess needs a classifier")
+            print("guess needs a classifier.")
             return
 
         tokens = self.sanitizer(text)
@@ -52,7 +47,7 @@ if __name__ == '__main__':
 
     g = Guesser()
     
-    print("Enter something to calucluate the synt of it!")
+    print("Enter something to calculate the synt of it!")
     print("Just press enter to quit.")
     
     while True:
