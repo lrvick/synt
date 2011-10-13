@@ -1,87 +1,80 @@
 # -*- coding: utf-8 -*-
 import nltk.classify.util
-from synt.utils.db import get_samples
-from synt.utils.redis_manager import RedisManager
+from synt.utils.db import get_samples, RedisManager
 from synt.utils.text import sanitize_text
-from synt.utils.extractors import best_word_feats
-from synt.guesser import guess
-from synt.logger import create_logger
+from synt.utils.extractors import WordExtractor, BestWordExtractor 
+from synt.guesser import guess 
 
-logger = create_logger(__file__)
-
-def test(test_samples=50000, feat_ex=best_word_feats, neutral_zone=0):
+def test(test_samples=50000, classifier='naivebayes', extractor=WordExtractor(), neutral_range=0):
     """
-    This first returns the accuracy of the classifier then proceeds
-    to test across known sentiments and produces a 'manual accuracy score'.
+    Returns two accuracies:
+        NLTK accuracy is the internal accuracy of the classifier 
+        Manual Accuracy is the accuracy when compared to pre-flagged/known samples and sentiment.
     
     Keyword Arguments:
-    test_samples    -- the amount of samples to test against
-    feat_ex         -- the feature extractor to use (utils/extractors)
-    neutral_zone    -- will be used to drop "neutrals" to see how real-world accuracy will look.
-                       In other words, in the case of neutral zone being 0.2 if the word
+    test_samples    -- The amount of samples to test against.
+    classifier      -- The classifier to use. NOTE: only supports naivebayes currently
+    extractor       -- The feature extractor to use. (found in utils.extractors)
+    neutral_range   -- Will be used to drop "neutrals" to see how real-world accuracy will look.
+                       For example in the case where neutral range is 0.2 if the sentiment 
                        guessed is not greater than 0.2 or less than -0.2 it is considered inaccurate.
-                       Leaving this set to 0 will always force the classifier
-                       to provide a positive or negaitve return even if it is unmeaningful
-                       i.e a score of 0.00001 is still positive but the classifier is 
-                       more than likely uncertain about it.
+                       Leaving this set to 0 will not cause the special case drops and will by default
+                       categorize text as either positive or negative. This may be undesired as the classifier
+                       will treat 0.0001 as positive even though it is not a strong indication.
     """
 
-    man = RedisManager()
-    classifier = man.load_classifier()
+    rm = RedisManager()
+    classifier = rm.load_classifier(classifier)
     
     if not classifier:
-        logger.error("test needs a classifier")
+        print("test needs a classifier")
         return
 
-    results = []
-    testfeats = []
-    accurate_samples = 0
-    
-    logger.info("Preparing %s testing Samples" % test_samples)
-    
-    offset = int(man.r.get('training_sample_count'))
+    #we want to make sure we are testing on a new set of samples therefore
+    #we use the training_sample_count as our offset and proceed to use the samples
+    #thereafter
+    offset = int(rm.r.get('training_sample_count'))
     if not offset: offset = 0
 
-    samples = get_samples(test_samples, offset=offset) #ensure we are using new testing samples
+    samples = get_samples(test_samples, offset=offset)
+    
+    testfeats = []
    
-    best_words = man.get_best_words()
     for text, label in samples:
-        s_text = sanitize_text(text) 
-        tokens = feat_ex(s_text, best_words=best_words)
+        tokens = sanitize_text(text) 
+        bag_of_words = extractor.extract(tokens) 
 
-        if tokens:
-            testfeats.append((tokens, label))
+        if bag_of_words:
+            testfeats.append((bag_of_words, label))
 
-    nltk_accuracy = nltk.classify.util.accuracy(classifier, testfeats)  * 100 # percentify
+    nltk_accuracy = nltk.classify.util.accuracy(classifier, gold=testfeats) * 100 # percentify
+    
+    total_guessed = 0
+    total_correct = 0
     
     for text, label in samples:
-        guessed = guess(text, best_words=best_words)
-       
-        if label.startswith('pos') and guessed > neutral_zone: 
-            accurate = True
-        elif label.startswith('neg') and guessed < -neutral_zone:
-            accurate = True
-        else:
-            accurate = False
-            
+        guessed = guess.guess(text )
         
-        results.append((accurate, label, guessed, text))
+        if abs(guessed) < neutral_range:
+            continue
+        
+        if (guessed > 0) == label.startswith('pos'):
+            total_correct += 1
+        
+        total_guessed += 1
     
-    for result in results:
-        
-        logger.info("Test: %s | Accuracy: %s | Known Sentiment: %s | Guessed Sentiment: %s " %  
-                (result[3], result[0], result[1], result[2]))
-        
-        if result[0] == True:
-            accurate_samples += 1
-       
-        total_accuracy = (accurate_samples * 100.00 / len(samples)) 
-    
-    classifier.show_most_informative_features(30)
-    logger.info("Manual classifier accuracy result: %s%%" % total_accuracy)
-    logger.info("NLTK classifier accuracy result: %.2f%%" % nltk_accuracy)
+    manual_accuracy =  total_correct * 100.0 / total_guessed
 
+    return nltk_accuracy, manual_accuracy, classifier
 
 if __name__ == "__main__":
-    #example test on 1000 samples
-    test(50000, neutral_zone=0.3)
+    #example test on 5000samples
+    test_samples = 5000
+
+    print("Testing on {} samples.".format(test_samples))
+    n_accur, m_accur, classifier = test(test_samples, neutral_range=0.2)
+
+    classifier.show_most_informative_features(10)
+
+    print("NLTK Accuracy: {}".format(n_accur))
+    print("Manual Accuracy: {}".format(m_accur))
