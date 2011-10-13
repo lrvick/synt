@@ -72,9 +72,20 @@ def train(samples=200000, classifier='naivebayes', best_features=10000, processe
 
 if __name__ == "__main__":
     #example train
+    import time
 
+    samples = 10000
+    best_features = None 
+    processes = 8
+    purge = True
+
+    print("Beginning train on {} samples.".format(samples))
+    start = time.time()
     train(
-        samples       = 10000,
-        best_features = None,
-        processes     = 8,
+        samples       = samples,
+        best_features = best_features,
+        processes     = processes,
+        purge         = purge,
     )
+
+    print("Successfully trained in {} seconds.".format(time.time() - start))
