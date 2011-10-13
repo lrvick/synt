@@ -17,6 +17,9 @@ setup(
         'nltk==2.0.1rc1',
         'PyYAML==3.09',
         'simplejson',
+        'kral',
+    ],
+    dependency_links = [
+        'http://github.com/Tawlk/kral/tarball/master#egg=kral',
     ]
-
 )
