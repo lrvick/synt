@@ -1,44 +1,32 @@
 # -*- coding: utf-8 -*-
 from nltk import NaiveBayesClassifier, FreqDist, ELEProbDist
 from utils.db import RedisManager
-from synt.logger import create_logger
-import time
-import cPickle as pickle
 from collections import defaultdict
 
-logger = create_logger(__file__)
-
-def train(samples=200000, best_features=10000, processes=8):
+def train(samples=200000, classifier='naivebayes', best_features=10000, processes=8, purge=False):
     """
-    Trains a Naive Bayes classifier with samples from database and stores the 
-    resulting classifier in Redis.
+    Train with samples from sqlite database and stores the resulting classifier in Redis.
   
     Keyword arguments:
     samples         -- the amount of samples to train on
+    classifier      -- the classifier to use 
+                       NOTE: currently only naivebayes is supported
     best_features   -- amount of highly informative features to store
-    processes       -- will be used for multiprocessing, it essentially translates to cpus
+    processes       -- will be used for counting features in parallel 
     """
    
-    start = time.time()
-
-    m = RedisManager()
+    m = RedisManager(purge=purge)
     m.r.set('training_sample_count', samples)
 
-    if 'classifier' in m.r.keys():
-        logger.info("Trained classifier exists in Redis. Purge first to re-train.")
+    if classifier in m.r.keys():
+        print("Classifier exists in Redis. Purge to re-train.")
         return
 
-    logger.info('Storing feature counts for %d samples.' % samples)
     m.store_feature_counts(samples, processes=processes)
-
-    logger.info('Building frequency distributions from feature counts.')
     m.store_freqdists()
-    
-    logger.info('Storing feature scores.')
     m.store_feature_scores()
     
     if best_features:
-        logger.info('Storing %d most informative features.' % best_features)
         m.store_best_features(best_features)
 
     label_freqdist = FreqDist()
@@ -50,7 +38,7 @@ def train(samples=200000, best_features=10000, processes=8):
     label_freqdist.inc('negative', int(neg_processed))
     label_freqdist.inc('positive', int(pos_processed))
 
-    conditional_fd = pickle.loads(m.r.get('label_fd'))
+    conditional_fd = m.pickle_load('label_fd')
     
     labels = conditional_fd.conditions()
 
@@ -77,21 +65,16 @@ def train(samples=200000, best_features=10000, processes=8):
         probdist = estimator(freqdist, bins=len(feature_values[fname]))
         feature_probdist[label,fname] = probdist
     
-    logger.info('Built feature probdist with %d items.' % len(feature_probdist.items()))
-
-    classifier = NaiveBayesClassifier(label_probdist, feature_probdist)
-    logger.info('Initialized classifier.')
+    c = NaiveBayesClassifier(label_probdist, feature_probdist)
     
-    m.store_classifier(classifier)
-    logger.info('Stored classifier to Redis.')
-    
-    logger.info('Finished in: %s seconds.' % (time.time() - start))
+    #TODO: support various classifiers
+    m.store_classifier(classifier, c)
 
 if __name__ == "__main__":
     #example train
 
     train(
-        samples       = 100,
+        samples       = 10000,
         best_features = None,
         processes     = 8,
     )
