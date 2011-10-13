@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tools to deal with multi-processing."""
 import multiprocessing
-from synt.logger import create_logger
-
-logger = create_logger(__file__)
 
 def batch_job(producer, consumer, chunksize=10000, processes=None):
     """
@@ -28,10 +25,8 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
             return producer[offset:offset+length]
         producer = tmp
 
-        logger.info("producer was a list, wrapping it in temporary producer.")
 
     if not processes:
-        logger.info("processes was 0 or none, using cpu count.")
         processes = multiprocessing.cpu_count()
     
     offset = 0
@@ -43,13 +38,11 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
     while not finished:
         
         for i in range(1, processes + 1):
-            logger.info("producing %r %r",offset,chunksize)
            
-            samples = producer(offset,chunksize)
+            samples = producer(offset, chunksize)
             
             if not samples:
                 finished = True
-                logger.info("Producer returned False/empty list. Quitting.")
                 break
             
             pool.apply_async(consumer, [samples])
@@ -57,38 +50,28 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
 
             offset += len(samples)
     
-    logger.info("Waiting for pools to clear.")
     pool.close() 
     pool.join() #wait for workers to finish
-    logger.info("Last pool finished.")
 
 if __name__=="__main__":
-    import time
+    #example usage
+    
     def producer(offset, length):
-        logger.info("Producing %r %r",offset,length)
-        
-        if offset >= 100:
+        if offset >= 50:
             return []
-        return range(offset,offset+length)
+        return range(offset, offset + length)
 
     queue = multiprocessing.Queue()
     def consumer(data):
         global queue
-        logger.info("Consuming: %r",len(data))
+        
         for i in data:
             queue.put(i)
 
-    logger.info("starting.")
-    start = time.time()
-    batch_job(producer,consumer,10)
-    logger.info("Finished: %r",time.time()-start)
-    
-    i = 0
-    msg = ""
+    batch_job(producer, consumer, 10)
+
+    out = []
+
     while not queue.empty():
-        i = i + 1 
-        msg += "%r "%queue.get()
-        if i == 10:
-            logger.info("%r",msg)
-            msg = ""
-            i=0
+        out.append(queue.get())
+    print out
