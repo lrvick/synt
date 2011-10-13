@@ -10,13 +10,14 @@ from synt import settings
 
 from kral import stream
 
-def collect(commit_every=100):
+def collect(commit_every=200, max_save=100000):
     """
     Will continuously populate the sample database if it exists
     else it will create a new one.
     
     Keyword Arguments:
     commit_every    -- by default will commit every 100 executes
+    max_save        -- will stop collecting at this number
     """
     
     db = db_init()
@@ -44,6 +45,9 @@ def collect(commit_every=100):
                 c += 1
                 if c % commit_every == 0: 
                     db.commit()
+                if c == max_save:
+                    break
+                
                 print("Collected {} samples to database.".format(c))
             except IntegrityError:
                 continue 
