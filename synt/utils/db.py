@@ -19,7 +19,7 @@ def db_init(create=True):
         conn = sqlite3.connect(settings.DB_FILE)
         cursor = conn.cursor()
         if create:
-            cursor.execute('''CREATE TABLE item (id integer primary key, item_id text unique, text text unique, sentiment text)''')
+            cursor.execute('''CREATE TABLE item (id integer primary key, text text unique, sentiment text)''')
     else:
         conn = sqlite3.connect(settings.DB_FILE)
     return conn
