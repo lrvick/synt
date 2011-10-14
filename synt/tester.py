@@ -51,10 +51,10 @@ def test(test_samples=50000, classifier='naivebayes', extractor=WordExtractor(),
     
     total_guessed = 0
     total_correct = 0
-    
+   
+
     for text, label in samples:
-        guessed = guess.guess(text )
-        
+        guessed = guess.guess(text)
         if abs(guessed) < neutral_range:
             continue
         
@@ -62,6 +62,8 @@ def test(test_samples=50000, classifier='naivebayes', extractor=WordExtractor(),
             total_correct += 1
         
         total_guessed += 1
+   
+    assert total_guessed, "There were no guesses, make sure you've trained on the same database you're testing."
     
     manual_accuracy =  total_correct * 100.0 / total_guessed
 
