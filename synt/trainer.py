@@ -25,14 +25,14 @@ def train(samples=200000, classifier='naivebayes', best_features=10000, processe
     m.store_feature_counts(samples, processes=processes)
     m.store_freqdists()
     m.store_feature_scores()
-    
+   
+    best_words = None
     if best_features:
         m.store_best_features(best_features)
+        best_words = m.get_best_features()
 
     label_freqdist = FreqDist()
     feature_freqdist = defaultdict(FreqDist)
-    feature_values = defaultdict(set)
-    fnames = set()
 
     neg_processed, pos_processed = m.r.get('negative_processed'), m.r.get('positive_processed')
     label_freqdist.inc('negative', int(neg_processed))
@@ -43,17 +43,12 @@ def train(samples=200000, classifier='naivebayes', best_features=10000, processe
     labels = conditional_fd.conditions()
 
     for label in labels:
-        for fname, fcount in conditional_fd[label].items():
-            feature_freqdist[label, fname].inc(True, fcount)
-            feature_values[fname].add(True)
-            fnames.add(fname)
-   
-    for label in labels:
-        num_samples = label_freqdist[label] #sample count for label 
-        for fname in fnames:
-            count = feature_freqdist[label, fname].N()
-            feature_freqdist[label, fname].inc(None, num_samples - count)
-            feature_values[fname].add(None)
+        samples = label_freqdist[label]
+        for fname in best_words:
+            trues = conditional_fd[label][fname] #is the count it happened
+            falses = samples - trues
+            feature_freqdist[label, fname].inc(True, trues)
+            feature_freqdist[label, fname].inc(False,falses)
 
     # Create the P(label) distribution
     estimator = ELEProbDist
@@ -62,9 +57,10 @@ def train(samples=200000, classifier='naivebayes', best_features=10000, processe
     # Create the P(fval|label, fname) distribution
     feature_probdist = {}
     for ((label, fname), freqdist) in feature_freqdist.items():
-        probdist = estimator(freqdist, bins=len(feature_values[fname]))
+        probdist = estimator(freqdist, bins=2) 
         feature_probdist[label,fname] = probdist
     
+    print len(feature_probdist.items())
     c = NaiveBayesClassifier(label_probdist, feature_probdist)
     
     #TODO: support various classifiers
@@ -74,8 +70,8 @@ if __name__ == "__main__":
     #example train
     import time
 
-    samples = 10000
-    best_features = None 
+    samples = 400000 
+    best_features = 5000 
     processes = 8
     purge = True
 
