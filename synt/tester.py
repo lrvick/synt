@@ -2,10 +2,10 @@
 import nltk.classify.util
 from synt.utils.db import get_samples, RedisManager
 from synt.utils.text import sanitize_text
-from synt.utils.extractors import WordExtractor, BestWordExtractor 
-from synt.guesser import guess 
+from synt.utils.extractors import WordExtractor, BestWordExtractor
+from synt.guesser import Guesser 
 
-def test(test_samples=50000, classifier='naivebayes', extractor=WordExtractor(), neutral_range=0):
+def test(test_samples=50000, classifier='naivebayes', extractor=BestWordExtractor, neutral_range=0):
     """
     Returns two accuracies:
         NLTK accuracy is the internal accuracy of the classifier 
@@ -37,24 +37,26 @@ def test(test_samples=50000, classifier='naivebayes', extractor=WordExtractor(),
     if not offset: offset = 0
 
     samples = get_samples(test_samples, offset=offset)
-    
-    testfeats = []
    
+    testfeats = []
+    feat_ex = extractor()
+
     for text, label in samples:
         tokens = sanitize_text(text) 
-        bag_of_words = extractor.extract(tokens) 
+        bag_of_words = feat_ex.extract(tokens) 
 
         if bag_of_words:
             testfeats.append((bag_of_words, label))
 
     nltk_accuracy = nltk.classify.util.accuracy(classifier, gold=testfeats) * 100 # percentify
-    
+
     total_guessed = 0
     total_correct = 0
-   
-
+    
+    g = Guesser(extractor=extractor)
+    
     for text, label in samples:
-        guessed = guess.guess(text)
+        guessed = g.guess(text)
         if abs(guessed) < neutral_range:
             continue
         
@@ -71,12 +73,12 @@ def test(test_samples=50000, classifier='naivebayes', extractor=WordExtractor(),
 
 if __name__ == "__main__":
     #example test on 5000samples
-    test_samples = 5000
+    test_samples = 75000 
 
     print("Testing on {} samples.".format(test_samples))
-    n_accur, m_accur, classifier = test(test_samples, neutral_range=0.2)
+    n_accur, m_accur, c = test(test_samples, neutral_range=0.2)
 
-    classifier.show_most_informative_features(10)
+    c.show_most_informative_features(30)
 
     print("NLTK Accuracy: {}".format(n_accur))
     print("Manual Accuracy: {}".format(m_accur))
