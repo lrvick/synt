@@ -5,7 +5,7 @@ import sqlite3
 import redis
 import cPickle as pickle
 from synt import settings
-from nltk.probability import ConditionalFreqDist
+from nltk.probability import ConditionalFreqDist, FreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
 from synt.utils.processing import batch_job
@@ -48,11 +48,11 @@ def redis_feature_consumer(samples):
             else:
                 neg_processed += 1
 
-            for word in set(tokens):
+            for word in set(tokens): #make sure we only add word once
                 pipeline.zincrby(count_label, word)
 
-    pipeline.set('negative_processed', neg_processed) 
-    pipeline.set('positive_processed', pos_processed)
+    pipeline.incr('negative_processed', neg_processed) 
+    pipeline.incr('positive_processed', pos_processed)
     
     pipeline.execute()
 
@@ -70,6 +70,7 @@ class RedisManager(object):
         Store features with counts to Redis.
         """
 
+        word_fd = FreqDist()
         label_word_freqdist = ConditionalFreqDist()
 
         pos_words = self.r.zrange('positive_wordcounts', 0, -1, withscores=True, desc=True)
@@ -79,11 +80,14 @@ class RedisManager(object):
 
         #build a condtional freqdist with the feature counts per label
         for word, count in pos_words:
-            label_word_freqdist['positive'][word] = count
+            word_fd.inc(word, count)
+            label_word_freqdist['positive'].inc(word, count)
 
         for word,count in neg_words:
-            label_word_freqdist['negative'][word] = count
+            word_fd.inc(word, count)
+            label_word_freqdist['negative'].inc(word, count)
 
+        self.pickle_store('word_fd', word_fd)
         self.pickle_store('label_fd', label_word_freqdist)
         
 
@@ -119,6 +123,7 @@ class RedisManager(object):
         """
         
         try:
+            word_fd = self.pickle_load('word_fd')
             label_word_freqdist = self.pickle_load('label_fd')
         except TypeError:
             print('Requires frequency distributions to be built.')
@@ -131,7 +136,7 @@ class RedisManager(object):
 
         for label in label_word_freqdist.conditions():
 
-            for word, freq in label_word_freqdist[label].iteritems():
+            for word, freq in word_fd.iteritems():
 
                 pos_score = BigramAssocMeasures.chi_sq(label_word_freqdist['positive'][word], (freq, pos_word_count), total_word_count)
                 neg_score = BigramAssocMeasures.chi_sq(label_word_freqdist['negative'][word], (freq, neg_word_count), total_word_count)
@@ -145,8 +150,10 @@ class RedisManager(object):
         self.r.set(name, pickle.dumps(data))
 
     def pickle_load(self, name):
-        return pickle.loads(self.r.get(name))
-
+        try:
+            return pickle.loads(self.r.get(name))
+        except TypeError:
+            return
     def store_classifier(self, name, classifier):
         """
         Stores a pickled a classifier into Redis.
@@ -162,11 +169,6 @@ class RedisManager(object):
         except TypeError:
             return     
 
-    def get_top_words(self, label, start=0, end=10):
-        """Return the top words for label from Redis store."""
-        if self.r.exists(label):
-            return self.r.zrange(label, start, end, withscores=True, desc=True) 
-
     def store_best_features(self, n=10000):
         """Store n best features to Redis."""
         if not n: return
@@ -176,30 +178,19 @@ class RedisManager(object):
         assert word_scores, "Word scores need to exist."
         
         best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
-        
+
         self.pickle_store('best_words',  best)
         
-    def get_best_words(self, scores=False):
+    def get_best_features(self):
         """
         Return cached best_words
 
         If scores provided will return word/score tuple.
         """
-        best_words = None
-        if 'best_words' in self.r.keys():
-            
-            best_words =  pickle.load('best_words')
+        best_words = self.pickle_load('best_words')
 
-            if not scores:
-                #in case of no scores we don't care about order
-                tmp = {}
-                for w in best_words:
-                    tmp.setdefault(w[0], None)
-                best_words = tmp 
-                #best_words = [w[0] for w in best_words]
-
-        return best_words
-
+        if best_words:
+            return set([word for word,score in best_words])
 
 def get_sample_limit():
     """
