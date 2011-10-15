@@ -33,7 +33,7 @@ class BestWordExtractor(WordExtractor):
         if best_words:
             self.best_words = best_words
         else:
-            self.best_words = RedisManager().get_best_words()
+            self.best_words = RedisManager().get_best_features()
 
     def extract(self, words):
         assert self.best_words, "This extractor relies on best words."
