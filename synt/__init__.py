@@ -36,8 +36,8 @@ def main():
     train_parser.add_argument(
         '--best_features',
         type=int,
-        default=0,
-        help="The amount of best words to use, or best features. By default none are used.",
+        default=5000,
+        help="The amount of best words to use, or best features. By default 5000 are used.",
     )
     train_parser.add_argument(
         '--purge',
