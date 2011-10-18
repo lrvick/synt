@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from synt.trainer import train
 from synt.collector import collect, fetch
-from synt.guesser import guess
+from synt.guesser import Guesser
 from synt.tester import test
 
 try:
@@ -15,121 +15,151 @@ def main():
 
     parser = argparse.ArgumentParser(description='Tool to interface with synt, provides a way to train, collect and guess from the command line.')
 
-    subparsers = parser.add_subparsers(help='sub-command help', dest='parser')
+    subparsers = parser.add_subparsers(dest='parser')
 
-    #train command
-    parser_train = subparsers.add_parser('train', help='Train a classifer')
-    parser_train.add_argument(
-            '--train_samples',
-            action='store',
-            type=int,
-            default=2000,
-            help="""The amount of samples to train on."""
+    #Train Parser
+    train_parser = subparsers.add_parser(
+            'train', 
+            help='Train a classifier.'
     )
-
-    parser_train.add_argument(
-            '--wc_samples',
-            action='store',
-            type=int,
-            default=2000,
-            help="""We store a word:count mapping to determine a list of useful and popular words to use.
-            This is the the number of samples to generate our words from. Generally you want this number to
-            be pretty high as it will gradually reduce variations and produce a consistent set of useful words."""
-    )
-
-    parser_train.add_argument(
-            '--wc_range',
-            action='store',
-            type=int,
-            default=2000,
-            help="""This is the actual amount of words to use to build freqDists. By this point (depending on how many word samples used) you will have a lot of tokens. Most of these tokens are uninformative and produce nothing but noise. This is the first layer of cutting down that batch to something reasonable. The number provided will use words
-            from 0 .. wc_range. Words are already sorted by most frequent to least."""
-
-    )
-
-    parser_train.add_argument(
-        '--bestwords_store',
-        action='store',
+    train_parser.add_argument(
+        'samples',
         type=int,
-        default=10000,
-        help= """The amount of best words to store. This will become the filterable list of informative words that the best_word_feats extractor uses."""
+        help="The amount of samples to train on. Uses the samples.db",
+    )
+    train_parser.add_argument(
+        '--classifier',
+        default='naivebayes',
+        choices=('naivebayes',),
+        help="The classifier to use. We currently only support naivebayes.",
+    )
+    train_parser.add_argument(
+        '--best_features',
+        type=int,
+        default=0,
+        help="The amount of best words to use, or best features. By default none are used.",
+    )
+    train_parser.add_argument(
+        '--purge',
+        default='no',
+        choices=('yes', 'no'),
+        help="Yes to purge the redis database. By default no."
+    ) 
+    train_parser.add_argument(
+        '--processes',
+        default=4,
+        help="Will utilize multiprocessing if available with this number of processes. By default 4."
     )
 
-    parser_train.add_argument(
-        '--fresh',
-        action='store',
+    #Collect parser
+    collect_parser = subparsers.add_parser(
+            'collect',
+            help='Collect samples.'
+    )
+    collect_parser.add_argument(
+        '--commit_every',
+        default=200,
         type=int,
-        default=False,
-        help="""If True this will force a new train, useful to test various sample, word count combinations. 1 = True 0 = False"""
+        help="Write to sqlite database after every 'this number'. Default is 200",
+    )
+    collect_parser.add_argument(
+        '--max_collect',
+        default=2000000,
+        type=int,
+        help="The amount to stop collecting at. Default is 2 million",
     )
 
-    parser_train.add_argument(
-        '--verbose',
-        action='store',
-        type=int,
+    #Fetch parser
+    fetch_parser = subparsers.add_parser(
+            'fetch', 
+            help='Fetches premade sample database.'
+    )
+    fetch_parser.add_argument(
+            'fetch', 
+            nargs='?',
+            default=True,
+            help="Fetches the default samples database from github."
+    )
+
+    #Guess parser
+    guess_parser = subparsers.add_parser(
+            'guess',
+            help='Guess sentiment'
+    )
+    guess_parser.add_argument(
+        'guess', 
+        nargs='?',
         default=True,
-        help="""Displays log info to stdout by default. 1 = True 0 = False"""
+        help="Starts the guess prompt.",
     )
-
-    #collect command
-    parser_collect = subparsers.add_parser('collect', help='Collect sample data.')
-    parser_collect.add_argument('fetch', help='Grab the sample_database')
-    parser_collect.add_argument('--time', action='store', type=int, default=500)
-
-    #guess command
-    parser_guess = subparsers.add_parser(
-        'guess',
-        description="Guess sentiment from given text. This relies on a trained classifier to exist in the database which means you should run 'train' before attempting to guess. The output is a float between -1 and 1 detailing how negative or positive the sentiment is. Anything close to 0 should be treated as relativley neutral.",
-        help="Guess sentiment from the command line."
+   
+    #Tester parser
+    tester_parser = subparsers.add_parser(
+            'tester', 
+            help='Test accuracy of classifier.',
     )
-    parser_guess.add_argument(
-            'text',
-            action='store',
-            help = 'Text to guess on.'
-    )
-
-    #tester commmand
-    parser_tester = subparsers.add_parser(
-        'test',
-        description = """Runs the tester test function to test accuracy. You can provide a number of samples by --samples [num]""", 
-        help = "Test classifier accuracy."
-    )
-    
-    parser_tester.add_argument(
-        '--samples',
-        action='store',
+    tester_parser.add_argument(
+        'samples', 
         type=int,
-        help='Tests the accuracy with number of samples as test samples.',
+        help="The amount of samples to test on."
     )
-
+    tester_parser.add_argument(
+        '--classifier',
+        default='naivebayes',
+        choices=('naivebayes',),
+        help="The classifier to use. Currently we only support naivebayes."
+    )
+    tester_parser.add_argument(
+        '--neutral_range',
+        default=0.0,
+        type=float,
+        help="Neutral range to use. By default there isn't one."
+    )
+   
     args = parser.parse_args()
 
     if args.parser == 'train':
+        
+        purge = False
+        if not args.purge == 'no':
+            purge = True
+
         train(
-            train_samples=args.train_samples,
-            word_count_samples=args.wc_samples,
-            word_count_range=args.wc_range,
-            bestwords_to_store=args.bestwords_store,
-            verbose=args.verbose,
-            force_update=args.fresh,
-    )
+            samples       = args.samples,
+            classifier    = args.classifier,
+            best_features = args.best_features,
+            processes     = args.processes,
+            pruge         = purge,
+        )
 
-    if args.parser == 'collect':
-        if args.fetch:
-            fetch()
-        else:
-            collect()
-        pass
+    elif args.parser == 'collect':
+        collect(
+            commit_every = args.commit_every,
+            max_collect  = args.max_collect,
+        )    
+    
+    elif args.parser == 'fetch':
+        fetch()
 
-    if args.parser == 'guess':
-        text = args.text.strip()
-        guess(text=text)
-
-    if args.parser == 'test':
-        if args.samples:
-            test(test_samples=args.samples)
-        else: #runs with default test_samples
-            test()
+    elif args.parser == 'guess':
+        g = Guesser()
+    
+        print("Enter something to calculate the synt of it!")
+        print("Just press enter to quit.")
+    
+        while True:
+            text = raw_input("synt> ")
+            if not text:
+                break    
+            print('Guessed: {}'.format(g.guess(text)))
+    
+    elif args.parser == 'tester':
+        test(
+            test_samples  = args.samples,
+            classifier    = args.classifier,
+            neutral_range = args.neutral_range,
+        )
+        
 
 if __name__ == '__main__':
     main()
