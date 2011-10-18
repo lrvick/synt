@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import time
+import time, datetime
 import os
 import bz2
 import urllib2
@@ -19,8 +19,12 @@ def collect(commit_every=200, max_collect=100000):
     commit_every    -- by default will commit every 100 executes
     max_collect     -- will stop collecting at this number
     """
-    
-    db = db_init()
+  
+
+    d = datetime.datetime.now()
+    db_name = "samples-%s-%s-%s.db" % (d.year, d.month, d.day)
+
+    db = db_init(db_name = db_name)
     cursor = db.cursor()
 
     queries = {
