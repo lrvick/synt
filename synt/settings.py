@@ -5,7 +5,7 @@ import os
 
 PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
 
-DB_FILE = os.path.expanduser('~/.synt/samples.db')
+DB_PATH = "~/.synt/"
 
 EMOTICONS = [
     ':-L', ':L', '<3', '8)', '8-)', '8-}', '8]', '8-]', '8-|', '8(', '8-(',
