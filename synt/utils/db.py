@@ -10,18 +10,21 @@ from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
 from synt.utils.processing import batch_job
 
-def db_init(create=True):
+def db_init(db_name='samples.db', create=True):
     """Initializes the sqlite3 database."""
-    if not os.path.exists(os.path.expanduser('~/.synt')):
-        os.makedirs(os.path.expanduser('~/.synt/'))
+    if not os.path.exists(os.path.expanduser(settings.DB_PATH)):
+        os.makedirs(os.path.expanduser(settings.DB_PATH))
 
-    if not os.path.exists(settings.DB_FILE):
-        conn = sqlite3.connect(settings.DB_FILE)
+    fp = os.path.join(os.path.expanduser(settings.DB_PATH), db_name)
+    print fp
+
+    if not os.path.exists(fp):
+        conn = sqlite3.connect(fp)
         cursor = conn.cursor()
         if create:
             cursor.execute('''CREATE TABLE item (id integer primary key, text text unique, sentiment text)''')
     else:
-        conn = sqlite3.connect(settings.DB_FILE)
+        conn = sqlite3.connect(fp)
     return conn
 
 
