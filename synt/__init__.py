@@ -129,7 +129,7 @@ def main():
             classifier    = args.classifier,
             best_features = args.best_features,
             processes     = args.processes,
-            pruge         = purge,
+            purge         = purge,
         )
 
     elif args.parser == 'collect':
