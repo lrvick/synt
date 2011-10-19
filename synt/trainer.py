@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from nltk import NaiveBayesClassifier, FreqDist, ELEProbDist
-from utils.db import RedisManager
+from utils.db import RedisManager, get_samples
 from collections import defaultdict
 
-def train(samples=200000, classifier='naivebayes', best_features=10000, processes=8, purge=False):
+def train(db, samples=200000, classifier='naivebayes', best_features=10000, processes=8, purge=False):
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
   
@@ -22,7 +22,9 @@ def train(samples=200000, classifier='naivebayes', best_features=10000, processe
         print("Classifier exists in Redis. Purge to re-train.")
         return
 
-    m.store_feature_counts(samples, processes=processes)
+    train_samples = get_samples(db, samples)
+
+    m.store_feature_counts(train_samples, processes=processes)
     m.store_freqdists()
     m.store_feature_scores()
    
@@ -60,7 +62,6 @@ def train(samples=200000, classifier='naivebayes', best_features=10000, processe
         probdist = estimator(freqdist, bins=2) 
         feature_probdist[label,fname] = probdist
     
-    print len(feature_probdist.items())
     c = NaiveBayesClassifier(label_probdist, feature_probdist)
     
     #TODO: support various classifiers
@@ -70,14 +71,16 @@ if __name__ == "__main__":
     #example train
     import time
 
+    db = 'samples.db'
     samples = 400000 
     best_features = 5000 
     processes = 8
     purge = True
 
-    print("Beginning train on {} samples.".format(samples))
+    print("Beginning train on {} samples using '{}' db..".format(samples, db))
     start = time.time()
     train(
+        db            = db, 
         samples       = samples,
         best_features = best_features,
         processes     = processes,

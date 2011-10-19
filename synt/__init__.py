@@ -23,6 +23,10 @@ def main():
             help='Train a classifier.'
     )
     train_parser.add_argument(
+        'db', 
+        help="The name of the training database to use. They are stored/retreived from ~/.synt/"
+    )
+    train_parser.add_argument(
         'samples',
         type=int,
         help="The amount of samples to train on. Uses the samples.db",
@@ -123,6 +127,7 @@ def main():
             purge = True
 
         train(
+            db            = args.db,
             samples       = args.samples,
             classifier    = args.classifier,
             best_features = args.best_features,

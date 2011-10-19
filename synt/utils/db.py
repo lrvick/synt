@@ -10,13 +10,12 @@ from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import sanitize_text
 from synt.utils.processing import batch_job
 
-def db_init(db_name='samples.db', create=True):
+def db_init(db='samples.db', create=True):
     """Initializes the sqlite3 database."""
     if not os.path.exists(os.path.expanduser(settings.DB_PATH)):
         os.makedirs(os.path.expanduser(settings.DB_PATH))
 
-    fp = os.path.join(os.path.expanduser(settings.DB_PATH), db_name)
-    print fp
+    fp = os.path.join(os.path.expanduser(settings.DB_PATH), db)
 
     if not os.path.exists(fp):
         conn = sqlite3.connect(fp)
@@ -108,17 +107,18 @@ class RedisManager(object):
                                it will be set to the default cpu count of your computer.
         """
 
-        if 'positive_wordcounts' in self.r.keys():
+        if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
             return
-        
-        def producer(offset, length):
-            if offset + length > samples:
-                length = samples - offset
-            if length < 1:
-                return []
-            return get_samples(length, offset=offset)
-                
-        batch_job(producer, redis_feature_consumer, chunksize)
+
+        #def producer(offset, length):
+        #    if offset + length > samples:
+        #        length = samples - offset
+        #    if length < 1:
+        #        return []
+        #    return get_samples(length, offset=offset)
+       
+
+        batch_job(samples, redis_feature_consumer, chunksize, processes)
         
     def store_feature_scores(self):
         """
@@ -226,12 +226,12 @@ def get_sample_limit():
     
     return limit
 
-def get_samples(limit=get_sample_limit(), offset=0):
+def get_samples(db, limit=get_sample_limit(), offset=0):
     """
     Returns a combined list of negative and positive samples.
     """
 
-    db = db_init()
+    db = db_init(db=db)
     cursor = db.cursor()
 
     sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ? OFFSET ?"
