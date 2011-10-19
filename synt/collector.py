@@ -74,9 +74,11 @@ def import_progress():
         print("Processed %s of 40423300 records (%0.2f%%)" % (prcount,percent))
     return 0
 
-def fetch():
+def fetch(db):
     """
     Pre-populates training database from public archive of ~2mil tweets
+    
+    Stores training database as 'db' in ~/.synt/
     """
     
     response = urllib2.urlopen('https://github.com/downloads/Tawlk/synt/sample_data.bz2')
@@ -90,10 +92,12 @@ def fetch():
 
     decompressor = bz2.BZ2Decompressor()
 
-    if os.path.exists(settings.DB_FILE):
-        os.remove(settings.DB_FILE)
+    fp = os.path.join(os.path.expanduser(settings.DB_PATH), db)
 
-    db = db_init(create=False)
+    if os.path.exists(fp):
+        os.remove(fp)
+
+    db = db_init(db=db, create=False)
     db.set_progress_handler(import_progress,20)
 
     while True:

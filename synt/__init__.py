@@ -75,10 +75,8 @@ def main():
             help='Fetches premade sample database.'
     )
     fetch_parser.add_argument(
-            'fetch', 
-            nargs='?',
-            default=True,
-            help="Fetches the default samples database from github."
+            'db', 
+            help="Fetches the default samples database from github and stores it as 'db' in ~/.synt/"
     )
 
     #Guess parser
@@ -139,7 +137,7 @@ def main():
         )    
     
     elif args.parser == 'fetch':
-        fetch()
+        fetch(args.db)
 
     elif args.parser == 'guess':
         g = Guesser()
@@ -154,7 +152,7 @@ def main():
             print('Guessed: {}'.format(g.guess(text)))
     
     elif args.parser == 'tester':
-        test(
+        n_accur, m_accur, classifier = test(
             test_samples  = args.samples,
             classifier    = args.classifier,
             neutral_range = args.neutral_range,
