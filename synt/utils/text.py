@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """Tools to deal with text processing."""
-
 import re
 import string
 from nltk.tokenize import WhitespaceTokenizer
@@ -9,21 +8,21 @@ from synt import settings
 #ordinal -> none character mapping
 PUNC_MAP = dict([(ord(x),None) for x in string.punctuation]) 
 
-def sanitize_text(text):
+def normalize_text(text):
     """
     Formats text to strip unneccesary:words, punctuation and whitespace. Returns a tokenized list.
    
     >>> text = "ommmmmmg how'r u!? visi t  <html> <a href='http://google.com'> my</a> site @ http://www.coolstuff.com haha"
-    >>> sanitize_text(text)
+    >>> normalize_text(text)
     [u'ommg', u'howr', u'visi', u'my', u'site', u'haha']
     
-    >>> sanitize_text("FOE JAPAN が粘り強く主張していた避難の権利")
+    >>> normalize_text("FOE JAPAN が粘り強く主張していた避難の権利")
     [u'foe', u'japan', u'\u304c\u7c98\u308a\u5f37\u304f\u4e3b\u5f35\u3057\u3066\u3044\u305f\u907f\u96e3\u306e\u6a29\u5229']
     
-    >>> sanitize_text('no ')
+    >>> normalize_text('no ')
     [u'no']
     
-    >>> sanitize_text('')
+    >>> normalize_text('')
     >>> 
     """
     
@@ -39,12 +38,11 @@ def sanitize_text(text):
         text = text.replace(e, '') #remove emoticons
     
     format_pats = (
-        #match, replace with
-        ("@[A-Za-z0-9_]+", ''), #twitter specific ""
-        ("#[A-Za-z0-9_]+", ''), # ""
+        ("@[A-Za-z0-9_]+", ''), #remove re-tweets 
+        ("#[A-Za-z0-9_]+", ''), #remove hash tags
         ("(\w)\\1{2,}", "\\1\\1"), #remove occurences of more than two consecutive repeating characters
         ("<[^<]+?>", ''), #remove html tags
-        ("(http|www)[^ ]*", ''),     
+        ("(http|www)[^ ]*", ''), #get rid of any left over urls    
     )
     
     for pat in format_pats:
