@@ -7,17 +7,21 @@ import cPickle as pickle
 from synt import settings
 from nltk.probability import ConditionalFreqDist, FreqDist
 from nltk.metrics import BigramAssocMeasures
-from synt.utils.text import sanitize_text
+from synt.utils.text import normalize_text
 from synt.utils.processing import batch_job
 
+def db_exists(name):
+    path = os.path.join(os.path.expanduser(settings.DB_PATH), name)
+    return True if os.path.exists(path) else False
+    
 def db_init(db='samples.db', create=True):
     """Initializes the sqlite3 database."""
     if not os.path.exists(os.path.expanduser(settings.DB_PATH)):
         os.makedirs(os.path.expanduser(settings.DB_PATH))
 
     fp = os.path.join(os.path.expanduser(settings.DB_PATH), db)
-
-    if not os.path.exists(fp):
+    
+    if not db_exists(db):
         conn = sqlite3.connect(fp)
         cursor = conn.cursor()
         if create:
@@ -27,14 +31,12 @@ def db_init(db='samples.db', create=True):
     return conn
 
 
-def redis_feature_consumer(samples):
+def redis_feature_consumer(samples, r):
     """
     Stores counts to redis via a pipeline.
     """
-    
-    m = RedisManager()
    
-    pipeline = m.r.pipeline()
+    pipeline = r.pipeline()
 
     neg_processed, pos_processed = 0, 0
 
@@ -42,7 +44,7 @@ def redis_feature_consumer(samples):
         
         count_label = label + '_wordcounts'
 
-        tokens = sanitize_text(text)
+        tokens = normalize_text(text)
 
         if tokens:
             if label.startswith('pos'):
@@ -58,11 +60,9 @@ def redis_feature_consumer(samples):
     
     pipeline.execute()
 
-
 class RedisManager(object):
 
     def __init__(self, db=5, host='localhost', purge=False):
-        
         self.r = redis.Redis(db=db, host=host)
         if purge: self.r.flushdb()
 
@@ -95,16 +95,14 @@ class RedisManager(object):
 
     def store_feature_counts(self, samples, chunksize=10000, processes=None):
         """
-        Stores word:count histograms for samples in Redis with the ability to increment.
-        
+        Stores feature:count histograms for samples in Redis with the ability to increment.
+       
+        Arguments:
+        samples             -- a list of samples in the format (text, label)
+
         Keyword Arguments:
-        wordcount_samples   -- the amount of samples to use for determining feature counts
         chunksize           -- the amount of samples to process at a time
-        processes           -- the amount of processors to run in async
-                               each process will be handed a chunksize of samples
-                               i.e:
-                               4 processes will be handed 10000 samples. If this is none 
-                               it will be set to the default cpu count of your computer.
+        processes           -- the amount of processors to use with multiprocessing  
         """
 
         if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
@@ -116,13 +114,12 @@ class RedisManager(object):
         #    if length < 1:
         #        return []
         #    return get_samples(length, offset=offset)
-       
 
-        batch_job(samples, redis_feature_consumer, chunksize, processes)
+        batch_job(samples, redis_feature_consumer(samples, self.r), chunksize, processes)
         
     def store_feature_scores(self):
         """
-        Stores 'word scores' into Redis.
+        Stores feature scores to Redis.
         """
         
         try:
@@ -148,7 +145,6 @@ class RedisManager(object):
       
         self.pickle_store('word_scores', word_scores)
 
-
     def pickle_store(self, name, data):
         self.r.set(name, pickle.dumps(data))
 
@@ -157,6 +153,7 @@ class RedisManager(object):
             return pickle.loads(self.r.get(name))
         except TypeError:
             return
+    
     def store_classifier(self, name, classifier):
         """
         Stores a pickled a classifier into Redis.
@@ -186,31 +183,26 @@ class RedisManager(object):
         
     def get_best_features(self):
         """
-        Return cached best_words
-
-        If scores provided will return word/score tuple.
+        Return stored best features.
         """
         best_words = self.pickle_load('best_words')
 
         if best_words:
             return set([word for word,score in best_words])
 
-def get_sample_limit():
+def get_sample_limit(db='samples.db'):
     """
     Returns the limit of samples so that both positive and negative samples
     will remain balanced.
-
-    ex. if returned value is 203 we can be confident in drawing that many samples
-    from both tables.
     """
 
     #this is an expensive operation in case of a large database
     #therefore we store the limit in redis and use that when we can
-    man = RedisManager()
-    if 'limit' in man.r.keys():
-        return int(man.r.get('limit'))
+    m = RedisManager()
+    if 'limit' in m.r.keys():
+        return int(m.r.get('limit'))
 
-    db = db_init()
+    db = db_init(db=db)
     cursor = db.cursor()
     cursor.execute("SELECT COUNT(*) FROM item where sentiment = 'positive'")
     pos_count = cursor.fetchone()[0]
@@ -222,11 +214,11 @@ def get_sample_limit():
         limit = neg_count
     
     #store to redis
-    man.r.set('limit', limit)
+    m.r.set('limit', limit)
     
     return limit
 
-def get_samples(db, limit=get_sample_limit(), offset=0):
+def get_samples(db, limit, offset=0):
     """
     Returns a combined list of negative and positive samples.
     """
