@@ -1,56 +1,54 @@
 # -*- coding: utf-8 -*-
 import unittest
 from synt.trainer import train
-from synt.utils import best_word_feats, RedisManager
-from synt.guesser import guess
+from synt.guesser import Guesser 
+from synt.utils.db import RedisManager
 
 class TrainerTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.man = RedisManager(db='testing')
+        self.man = RedisManager(db=10) #testing db
 
     def test_train_success(self):
-        #stores classifier in redis
-        train(
-            feat_ex=best_word_feats,
-            train_samples=100,
-            wordcount_samples=50,
-            verbose=False,
-        )
-        self.assertTrue('classifier' in self.man.r.keys())
+        train('samples.db', 1000, best_features=None, purge=True, redis_db=10)
+        self.assertTrue('naivebayes' in self.man.r.keys())
     
+    def test_train_bestwords_success(self):
+        train('samples.db', 1000, best_features=500, purge=True, redis_db=10)
+        self.assertTrue('naivebayes' in self.man.r.keys())
+        self.assertTrue('best_words' in self.man.r.keys())
+
+    def test_train_unsupported_classifier(self):
+        self.assertEqual(train('samples.db', classifier='xyz'), None)
+
+    def test_train_bad_samples(self):
+        self.assertEqual(train('samples.db', -2000), None)
+
+    def test_train_bad_db(self):
+        self.assertEqual(train('doesntexist', 1000), None)
+
     def tearDown(self):
         self.man.r.flushdb()
 
 class GuesserTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.man = RedisManager(db='testing')
-        
-        #stores a classifier in redis
-        train(
-            feat_ex=best_word_feats,
-            train_samples=100,
-            wordcount_samples=50,
-            verbose=False,
-        )
-
-    def test_load_classifier(self):
-        classifier = self.man.load_classifier()
-        self.assertIsNotNone(classifier)
+        self.man = RedisManager(db=10) #testing db
+        train('samples.db', 1000, classifier='naivebayes', purge=True)
+        self.g = Guesser().guess
 
     def test_guess_with_text(self):
-        score = guess('some random text', classifier=self.man.load_classifier())
+        score = self.g('some random text')
         self.assertEqual(type(score), float)
         self.assertTrue(-1.0 <= score <= 1.0) 
 
     def test_guess_no_text(self):
-        score = guess('', classifier=self.man.load_classifier())
+        score = self.g('')
         self.assertEqual(type(score), float)
         self.assertEqual(score, 0.0)
 
     def test_guess_unicode(self):
-        score = guess("FOE JAPANが粘り強く主張していた避難の権利", classifier=self.man.load_classifier())
+        score = self.g("FOE JAPANが粘り強く主張していた避難の権利")
         self.assertEqual(type(score), float)
         self.assertTrue(-1.0 <= score <= 1.0) 
 
