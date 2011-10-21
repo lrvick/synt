@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from synt.utils.db import RedisManager
 from synt.utils.extractors import WordExtractor, BestWordExtractor
-from synt.utils.text import sanitize_text
-
+from synt.utils.text import normalize_text
 
 class Guesser(object):
     
@@ -10,7 +9,7 @@ class Guesser(object):
         
         self.classifier = RedisManager().load_classifier(classifier) 
         self.extractor = extractor()
-        self.sanitizer = sanitize_text
+        self.normalizer = normalize_text
     
     def guess(self, text):
         """
@@ -21,7 +20,7 @@ class Guesser(object):
             print("guess needs a classifier.")
             return
 
-        tokens = self.sanitizer(text)
+        tokens = self.normalizer(text)
       
         bag_of_words = self.extractor.extract(tokens)
        
