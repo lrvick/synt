@@ -67,6 +67,12 @@ def main():
             help='Collect samples.'
     )
     collect_parser.add_argument(
+        '--db',
+        default=None,
+        help="Optional database name to store as.",
+                
+    )
+    collect_parser.add_argument(
         '--commit_every',
         default=200,
         type=int,
@@ -144,6 +150,7 @@ def main():
 
     elif args.parser == 'collect':
         collect(
+            db           = args.db,
             commit_every = args.commit_every,
             max_collect  = args.max_collect,
         )    
