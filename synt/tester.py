@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
 import nltk.classify.util
 from synt.utils.db import get_samples, RedisManager
-from synt.utils.text import sanitize_text
+from synt.utils.text import normalize_text
 from synt.utils.extractors import WordExtractor, BestWordExtractor
 from synt.guesser import Guesser 
 
-def test(test_samples=50000, classifier='naivebayes', extractor=BestWordExtractor, neutral_range=0):
+def test(db, test_samples, classifier='naivebayes', extractor=WordExtractor, neutral_range=0, offset=0):
     """
     Returns two accuracies:
         NLTK accuracy is the internal accuracy of the classifier 
         Manual Accuracy is the accuracy when compared to pre-flagged/known samples and sentiment.
-    
+   
+    Arguments:
+    db              -- the db to use, db's are found in ~/.synt
+    test_samples    -- the amoun tof samples to test on
+
     Keyword Arguments:
-    test_samples    -- The amount of samples to test against.
-    classifier      -- The classifier to use. NOTE: only supports naivebayes currently
+    classifier      -- The classifier type to use. NOTE: only supports naivebayes currently
     extractor       -- The feature extractor to use. (found in utils.extractors)
     neutral_range   -- Will be used to drop "neutrals" to see how real-world accuracy will look.
                        For example in the case where neutral range is 0.2 if the sentiment 
@@ -32,21 +35,24 @@ def test(test_samples=50000, classifier='naivebayes', extractor=BestWordExtracto
 
     #we want to make sure we are testing on a new set of samples therefore
     #we use the training_sample_count as our offset and proceed to use the samples
-    #thereafter
-    offset = int(rm.r.get('training_sample_count'))
-    if not offset: offset = 0
+    #thereafter, unless an offset is otherwise specified
+    if not offset:
+        offset = int(rm.r.get('training_sample_count'))
 
-    samples = get_samples(test_samples, offset=offset)
+    samples = get_samples(db, test_samples, offset=offset)
    
     testfeats = []
     feat_ex = extractor()
 
+    #normalization and extraction
     for text, label in samples:
-        tokens = sanitize_text(text) 
+        tokens = normalize_text(text) 
         bag_of_words = feat_ex.extract(tokens) 
 
         if bag_of_words:
             testfeats.append((bag_of_words, label))
+
+    print testfeats[:5]
 
     nltk_accuracy = nltk.classify.util.accuracy(classifier, gold=testfeats) * 100 # percentify
 
@@ -73,7 +79,7 @@ def test(test_samples=50000, classifier='naivebayes', extractor=BestWordExtracto
 
 if __name__ == "__main__":
     #example test on 5000samples
-    test_samples = 75000 
+    test_samples = 25000 
 
     print("Testing on {} samples.".format(test_samples))
     n_accur, m_accur, c = test(test_samples, neutral_range=0.2)
