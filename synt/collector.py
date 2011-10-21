@@ -10,21 +10,23 @@ from synt import settings
 
 from kral import stream
 
-def collect(commit_every=200, max_collect=100000):
+def collect(db=None, commit_every=200, max_collect=100000):
     """
     Will continuously populate the sample database if it exists
     else it will create a new one.
     
     Keyword Arguments:
-    commit_every    -- by default will commit every 100 executes
+    db              -- can take a custom db name to save as
+    commit_every    -- commit to sqlite after commit_every executes
     max_collect     -- will stop collecting at this number
     """
-  
+ 
+    if not db:
+        d = datetime.datetime.now()
+        #if no dbname is provided we'll store a timestamped db name
+        db = "samples-%s-%s-%s.db" % (d.year, d.month, d.day)
 
-    d = datetime.datetime.now()
-    db_name = "samples-%s-%s-%s.db" % (d.year, d.month, d.day)
-
-    db = db_init(db_name = db_name)
+    db = db_init(db=db)
     cursor = db.cursor()
 
     queries = {
@@ -33,10 +35,10 @@ def collect(commit_every=200, max_collect=100000):
     }
 
     print("Collection on {} queries.".format(queries.keys()))
+    #collect on twitter with kral
     g = stream(query_list=queries.keys(), service_list="twitter") 
 
     c = 0
-    
     for item in g:
         
         text = unicode(item['text'])
@@ -138,7 +140,7 @@ def fetch(db):
 
 if __name__ == '__main__':
     max_collect = 2000000
-    write_every = 1000
+    commit_every = 1000
 
-    collect(write_every, max_collect)
+    collect(commit_every = commit_every, max_collect = max_collect)
 
