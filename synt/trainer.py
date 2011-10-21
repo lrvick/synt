@@ -1,25 +1,41 @@
 # -*- coding: utf-8 -*-
-from nltk import NaiveBayesClassifier, FreqDist, ELEProbDist
-from utils.db import RedisManager, get_samples
+from nltk import FreqDist, ELEProbDist
+from utils.db import RedisManager, get_samples, db_exists
 from collections import defaultdict
+from synt.utils.extractors import WordExtractor, BestWordExtractor
+from synt import settings
 
-def train(db, samples=200000, classifier='naivebayes', best_features=10000, processes=8, purge=False):
+#def build_classifier():
+#    pass
+
+def train(db, samples=200000, classifier='naivebayes', extractor=WordExtractor, best_features=10000, processes=8, purge=False, redis_db=5):
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
-  
+
+    Argguments:
+    db              -- the training database to use
+
     Keyword arguments:
     samples         -- the amount of samples to train on
-    classifier      -- the classifier to use 
-                       NOTE: currently only naivebayes is supported
+    classifier      -- the type of classifier to use NOTE: currently only naivebayes is supported
     best_features   -- amount of highly informative features to store
     processes       -- will be used for counting features in parallel 
+    redis_db        -- the redis_db to use 
     """
-   
-    m = RedisManager(purge=purge)
+    
+    if not (db_exists(db) or samples <= 0):
+        return
+
+    m = RedisManager(db=redis_db, purge=purge) 
+
     m.r.set('training_sample_count', samples)
 
     if classifier in m.r.keys():
         print("Classifier exists in Redis. Purge to re-train.")
+        return
+
+    _classifier = settings.CLASSIFIERS.get(classifier, None)
+    if not _classifier: #not supported 
         return
 
     train_samples = get_samples(db, samples)
@@ -28,10 +44,8 @@ def train(db, samples=200000, classifier='naivebayes', best_features=10000, proc
     m.store_freqdists()
     m.store_feature_scores()
    
-    best_words = None
     if best_features:
         m.store_best_features(best_features)
-        best_words = m.get_best_features()
 
     label_freqdist = FreqDist()
     feature_freqdist = defaultdict(FreqDist)
@@ -41,12 +55,16 @@ def train(db, samples=200000, classifier='naivebayes', best_features=10000, proc
     label_freqdist.inc('positive', int(pos_processed))
 
     conditional_fd = m.pickle_load('label_fd')
-    
+
     labels = conditional_fd.conditions()
+    
+    #feature extraction
+    feat_ex = extractor()
+    extracted_set = set([feat_ex.extract(conditional_fd[label].keys(), as_list=True) for label in labels][0])  
 
     for label in labels:
         samples = label_freqdist[label]
-        for fname in best_words:
+        for fname in extracted_set:
             trues = conditional_fd[label][fname] #is the count it happened
             falses = samples - trues
             feature_freqdist[label, fname].inc(True, trues)
@@ -62,17 +80,18 @@ def train(db, samples=200000, classifier='naivebayes', best_features=10000, proc
         probdist = estimator(freqdist, bins=2) 
         feature_probdist[label,fname] = probdist
     
-    c = NaiveBayesClassifier(label_probdist, feature_probdist)
+    #NOTE: naivebayes supports this prototype, future classifiers will most likely not
+    _c = _classifier(label_probdist, feature_probdist) 
     
     #TODO: support various classifiers
-    m.store_classifier(classifier, c)
+    m.store_classifier(classifier, _c)
 
 if __name__ == "__main__":
     #example train
     import time
 
     db = 'samples.db'
-    samples = 400000 
+    samples = 1000 
     best_features = 5000 
     processes = 8
     purge = True
@@ -80,11 +99,11 @@ if __name__ == "__main__":
     print("Beginning train on {} samples using '{}' db..".format(samples, db))
     start = time.time()
     train(
-        db            = db, 
-        samples       = samples,
-        best_features = best_features,
-        processes     = processes,
-        purge         = purge,
+            db            = db, 
+            samples       = samples,
+            best_features = best_features,
+            processes     = processes,
+            purge         = purge,
     )
 
     print("Successfully trained in {} seconds.".format(time.time() - start))
