@@ -2,6 +2,7 @@
 """Settings for synt project."""
 
 import os
+import nltk
 
 PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
 
@@ -17,3 +18,8 @@ EMOTICONS = [
 ]
 
 IGNORE_STRINGS = ['RT', ':-P', ':-p', ';-P', ';-p', ':P', ':p', ';P', ';p']
+
+CLASSIFIERS = {
+        'naivebayes': nltk.NaiveBayesClassifier,
+        #'maxent': nltk.MaximumEntClassifier,
+}
