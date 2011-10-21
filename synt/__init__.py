@@ -35,7 +35,7 @@ def main():
         '--classifier',
         default='naivebayes',
         choices=('naivebayes',),
-        help="The classifier to use. We currently only support naivebayes.",
+        help="The classifier to use. See help for currently supported classifier.",
     )
     train_parser.add_argument(
         '--best_features',
@@ -53,6 +53,12 @@ def main():
         '--processes',
         default=4,
         help="Will utilize multiprocessing if available with this number of processes. By default 4."
+    )
+    train_parser.add_argument(
+        '--redis_db',
+        default = 5, 
+        type=int,
+        help="The redis db to use. By default 5",
     )
 
     #Collect parser
@@ -133,6 +139,7 @@ def main():
             best_features = args.best_features,
             processes     = args.processes,
             purge         = purge,
+            redis_db      = args.redis_db, 
         )
 
     elif args.parser == 'collect':
