@@ -4,30 +4,40 @@
 
 ## About ##
 
-  Synt (pronounced: "cent") is a python library aiming to be a general
-  solution to identifying a given peice of text, particularly social
-  network statuses, as either negative, neutral, or positive.
+  Synt (pronounced: "cent") is a python library for sentiment
+  classification on social text.
+
+  The end-goal is to have a simple library that "just works". It should
+  have an easy barrier to entry and be thoroughly documented. 
+
 
 ## Current Features ##
 
-  * Can create training data from random twitter statuses
-  * Uses emoticons to automatically sort out positive/negative training samples
-  * Includes a manual trainer to classify posts by hand
-  * Ability to granularly generate classifiers by adjusting sample/token/entropy levels
+  * Can collect negative/positive tweets from twitter and store it to a local
+    database (can also fetch a pre-existing samples database)
+  * Can train a classifier based on a samples database 
+  * Can classifiy text and output a score between -1 and 1. (where -1 is
+    negative, +1 is positive and anything close to 0 can be considered neutral)
+  * abilitiy to collect, train, guess, and test (accuracy) with from cli 
+
 
 ## Requirements ##
 
   * A running [Redis](http://redis.com) server
   * [pip](http://www.pip-installer.org/en/latest/index.html)
   * [virtualenv](http://www.virtualenv.org/en/latest/index.html) (recommended)
-  * [python2.7](http://www.python.org/getit/releases/2.7/)
+  * [python2.7](http://www.python.org/getit/releases/2.7/) (no support for
+    python3.x)
     * sqlite3 issue was fixed in 2.7 [issue](http://code.google.com/p/pysqlite/source/detail?r=9e3fa82223b89ca4e7f9eadedc1297ab5c3eebd9)
     * argparse
-  * PyYAML==3.09
+  * PyYAML (pip install pyyaml)
     * unfortnatley nltk requires pyyaml before it can be installed [bug](http://code.google.com/p/nltk/issues/detail?id=508)
 
 
 ## Usage / Installation ##
+
+**Note:** Many of these commands have additional arguments you can pass, use
+the -h flag to get help on any particular command and see more options.
 
   1. Grab the latest synt:
 
@@ -38,46 +48,85 @@
   2. Grab the sample database to train on (or build one (below)):
 
     ```bash
-    synt collect fetch
+    synt fetch
     ```
+    
+    By default it will be stored as 'samples.db' but you can override this by
+    providing the --db argument.
 
     If you'd prefer to build a fresh sample db and have the time, just run collect with
-    the desired number of recent posts you wish to fetch.
+    the desired number of items.
 
     ```bash
-    synt collect 1000
+    synt collect --max_collect 10000 --db 'db_name' 
     ```
+    
+    **Note:** You can also increment samples in a database by providing the
+    same db name.
 
-    **Note**: This also can update an existing database. For instance, If you
-    decided to initially use fetch to populate the db, adding more via collect
-    should still work.
 
+  3. Train classifier
 
-  3. Build classifier
+    A basic example of training
 
     ```bash
-    synt train
+    synt train 'samples.db' 20000 
     ```
+    
+    Train takes two required arguments: a training database (it's name), and the amount of
+    samples to train on.  
 
-  4. Usage:
 
-    ```python
-    from synt import guess
-    guess('My mother in law makes me do bad things and I think pandas are icky!')
-    ```
-    Or on the command line:
+  4. Classifier accuracy
+
+    At this point you might want to see the classifiers accuracy on the
+    training data. 
 
     ```bash
-    synt guess 'I want to chase poodles. That makes me happy and joyful :-D'
+    synt accuracy 
     ```
 
-    This will return a score from -1 .. 1 negative to positive respectivley.
+    Accuracy takes a number of testing samples. By default 25% of your training 
+    sample count will be used as the testing set. You can over-ride this by
+    providing the --test_samples argument.
 
-    Anything close to 0 should be considered neutral.
+    The database used for these testing samples will be the same as the database
+    used to train. The testing samples will be new samples and can be
+    guaranteed to be samples the classifier hasn't already seen.
+
+
+  5. Guessing/classifying text
+    
+    You should now have a trained classifier and its time to see
+    some classification of text.
+
+    ```bash
+    synt guess
+    ```
+    
+    This will drop you into a synt prompt where you can write text and see
+    the score between -1 and 1.
+
+    You can alternativley also just classify text without having to drop into
+    a prompt:
+
+    ```bash
+    synt guess --text "i love ponies" 
+    ```
 
 
 ## Notes ##
 
-  Use at your own risk. You may be eaten by a grue.
+  * We have acheived best accuracy using stopwords filtering with tweets collected on
+    negwords.txt and poswords.txt (see downloads).
+
+  * In the future we will also add the MaxEnt and Decision tree classifiers and
+    the functionality to do clasiffier voting.
+
+  * Note that this is optimized for classification on social text as this is our
+    primary usecase. However, with a little tweaking it should be possible to
+    get good results on other corpus'.
+
+  This code is still in production; use at your own risk. You may be eaten by a grue.
 
   Questions/Comments? Please check us out on IRC via irc://udderweb.com/#uw
