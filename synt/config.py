@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Settings for synt project."""
+"""Config for synt project."""
 
 import os
 import nltk
@@ -17,9 +17,10 @@ EMOTICONS = [
     ':-(', ':, (', ':\'(', ':-]', ':-[', ':]', ':[', '>.>', '<.<'
 ]
 
-IGNORE_STRINGS = ['RT', ':-P', ':-p', ';-P', ';-p', ':P', ':p', ';P', ';p']
-
 CLASSIFIERS = {
-        'naivebayes': nltk.NaiveBayesClassifier,
-        #'maxent': nltk.MaximumEntClassifier,
+    'naivebayes'   : nltk.NaiveBayesClassifier,
+    #'maxent'      : nltk.MaximumEntClassifier,
+    #'decisiontree': nltk.DecisionTreeClassifier, 
 }
+
+
