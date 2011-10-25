@@ -3,7 +3,7 @@
 import re
 import string
 from nltk.tokenize import WhitespaceTokenizer
-from synt import settings
+from synt import config
 
 #ordinal -> none character mapping
 PUNC_MAP = dict([(ord(x),None) for x in string.punctuation]) 
@@ -34,9 +34,10 @@ def normalize_text(text):
 
     text = text.lower()
     
-    for e in settings.EMOTICONS:
-        text = text.replace(e, '') #remove emoticons
-    
+    #for e in config.EMOTICONS:
+        #text = text.replace(e, '') #remove emoticons
+        
+
     format_pats = (
         ("@[A-Za-z0-9_]+", ''), #remove re-tweets 
         ("#[A-Za-z0-9_]+", ''), #remove hash tags
@@ -47,10 +48,18 @@ def normalize_text(text):
     
     for pat in format_pats:
         text = re.sub(pat[0], pat[1], text)
+  
+    _tmp = set()
+    for e in config.EMOTICONS:
+        if e in text:
+            _tmp.add(e)
+    
+    text = text.translate(PUNC_MAP).strip() + ' ' #remove punctuation
+    if _tmp:
+        text += ' '.join([e for e in _tmp]) #attach emoticons back
    
+
     if text:
-        text = text.translate(PUNC_MAP) #strip punctuation
-        
         #tokenize on words longer than 1 char
         words = [w for w in WhitespaceTokenizer().tokenize(text) if len(w) > 1]
     
