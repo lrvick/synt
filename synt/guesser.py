@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 from synt.utils.db import RedisManager
-from synt.utils.extractors import WordExtractor, BestWordExtractor
+from synt.utils.extractors import get_extractor
 from synt.utils.text import normalize_text
 
 class Guesser(object):
     
-    def __init__(self, classifier='naivebayes', extractor=WordExtractor):
+    def __init__(self, classifier='naivebayes', extractor='words', redis_db=5):
         
-        self.classifier = RedisManager().load_classifier(classifier) 
-        self.extractor = extractor()
+        self.classifier = RedisManager(db=redis_db).pickle_load(classifier) 
+        self.extractor = get_extractor(extractor)()
         self.normalizer = normalize_text
     
     def guess(self, text):
