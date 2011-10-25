@@ -4,22 +4,22 @@ import os
 import sqlite3
 import redis
 import cPickle as pickle
-from synt import settings
 from nltk.probability import ConditionalFreqDist, FreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import normalize_text
 from synt.utils.processing import batch_job
+from synt import config
 
 def db_exists(name):
-    path = os.path.join(os.path.expanduser(settings.DB_PATH), name)
+    path = os.path.join(os.path.expanduser(config.DB_PATH), name)
     return True if os.path.exists(path) else False
     
 def db_init(db='samples.db', create=True):
     """Initializes the sqlite3 database."""
-    if not os.path.exists(os.path.expanduser(settings.DB_PATH)):
-        os.makedirs(os.path.expanduser(settings.DB_PATH))
+    if not os.path.exists(os.path.expanduser(config.DB_PATH)):
+        os.makedirs(os.path.expanduser(config.DB_PATH))
 
-    fp = os.path.join(os.path.expanduser(settings.DB_PATH), db)
+    fp = os.path.join(os.path.expanduser(config.DB_PATH), db)
     
     if not db_exists(db):
         conn = sqlite3.connect(fp)
@@ -31,12 +31,13 @@ def db_init(db='samples.db', create=True):
     return conn
 
 
-def redis_feature_consumer(samples, r):
+def redis_feature_consumer(samples, db=None):
     """
     Stores counts to redis via a pipeline.
     """
-   
-    pipeline = r.pipeline()
+ 
+    rm = RedisManager(db=db)
+    pipeline = rm.r.pipeline()
 
     neg_processed, pos_processed = 0, 0
 
@@ -64,6 +65,7 @@ class RedisManager(object):
 
     def __init__(self, db=5, host='localhost', purge=False):
         self.r = redis.Redis(db=db, host=host)
+        self.db = db
         if purge: self.r.flushdb()
 
 
@@ -115,7 +117,7 @@ class RedisManager(object):
         #        return []
         #    return get_samples(length, offset=offset)
 
-        batch_job(samples, redis_feature_consumer(samples, self.r), chunksize, processes)
+        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, db=self.db)
         
     def store_feature_scores(self):
         """
@@ -146,28 +148,14 @@ class RedisManager(object):
         self.pickle_store('word_scores', word_scores)
 
     def pickle_store(self, name, data):
-        self.r.set(name, pickle.dumps(data))
+        dump = pickle.dumps(data, protocol=1) #highest_protocol breaks somethign in nltk
+        self.r.set(name, dump)
 
     def pickle_load(self, name):
         try:
             return pickle.loads(self.r.get(name))
         except TypeError:
             return
-    
-    def store_classifier(self, name, classifier):
-        """
-        Stores a pickled a classifier into Redis.
-        """
-        self.pickle_store(name, classifier)
-
-    def load_classifier(self, name):
-        """
-        Loads (unpickles) a classifier from Redis.
-        """
-        try:
-            return self.pickle_load(name)    
-        except TypeError:
-            return     
 
     def store_best_features(self, n=10000):
         """Store n best features to Redis."""
@@ -233,7 +221,7 @@ def get_samples(db, limit, offset=0):
     if limit > get_sample_limit():
         limit = get_sample_limit()
 
-    if not limit % 2 == 0:
+    if limit % 2 != 0:
         limit -= 1 #we want an even number
     
     limit = limit / 2 
