@@ -6,8 +6,7 @@ import urllib2
 from sqlite3 import IntegrityError
 from cStringIO import StringIO
 from synt.utils.db import db_init
-from synt import settings
-
+from synt import config
 from kral import stream
 
 def collect(db=None, commit_every=200, max_collect=100000):
@@ -34,7 +33,6 @@ def collect(db=None, commit_every=200, max_collect=100000):
         ':(' : 'negative',
     }
 
-    print("Collection on {} queries.".format(queries.keys()))
     #collect on twitter with kral
     g = stream(query_list=queries.keys(), service_list="twitter") 
 
@@ -51,10 +49,10 @@ def collect(db=None, commit_every=200, max_collect=100000):
                 c += 1
                 if c % commit_every == 0: 
                     db.commit()
+                    print("Commited {}".format(commit_every))
                 if c == max_collect:
                     break
                 
-                print("Collected {} samples to database.".format(c))
             except IntegrityError:
                 continue 
     
@@ -94,7 +92,7 @@ def fetch(db):
 
     decompressor = bz2.BZ2Decompressor()
 
-    fp = os.path.join(os.path.expanduser(settings.DB_PATH), db)
+    fp = os.path.join(os.path.expanduser(config.DB_PATH), db)
 
     if os.path.exists(fp):
         os.remove(fp)
