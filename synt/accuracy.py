@@ -2,47 +2,60 @@
 import nltk.classify.util
 from synt.utils.db import get_samples, RedisManager
 from synt.utils.text import normalize_text
-from synt.utils.extractors import WordExtractor, BestWordExtractor
+from synt.utils.extractors import get_extractor
 from synt.guesser import Guesser 
 
-def test(db, test_samples, classifier='naivebayes', extractor=WordExtractor, neutral_range=0, offset=0):
+def test_accuracy(db='', test_samples=0, neutral_range=0, offset=0, redis_db=5):
     """
     Returns two accuracies:
         NLTK accuracy is the internal accuracy of the classifier 
-        Manual Accuracy is the accuracy when compared to pre-flagged/known samples and sentiment.
+        Manual Accuracy is the accuracy when compared to pre-flagged/known samples and label.
    
-    Arguments:
-    db              -- the db to use, db's are found in ~/.synt
-    test_samples    -- the amoun tof samples to test on
-
     Keyword Arguments:
-    classifier      -- The classifier type to use. NOTE: only supports naivebayes currently
-    extractor       -- The feature extractor to use. (found in utils.extractors)
+    db              -- the samples database to use, by default this is the same as your trained database
+                       with an offset to ensure unseen data, should be a string database name located in ~/.synt
+    test_samples    -- the amount of samples to use, by default this will be 25% of the training set amount
     neutral_range   -- Will be used to drop "neutrals" to see how real-world accuracy will look.
                        For example in the case where neutral range is 0.2 if the sentiment 
                        guessed is not greater than 0.2 or less than -0.2 it is considered inaccurate.
                        Leaving this set to 0 will not cause the special case drops and will by default
                        categorize text as either positive or negative. This may be undesired as the classifier
                        will treat 0.0001 as positive even though it is not a strong indication.
+    offset          -- by default the offset is decided from the end of the the trained amount, i.e 
+                       if you've trained on 1000 and you have 250 testing samples the samples retrieved
+                       will be from 1000-1250, you can override this offset if you wish to use a different
+                       subset
+    redis_db        -- the redis database to use
     """
 
-    rm = RedisManager()
-    classifier = rm.load_classifier(classifier)
+    m = RedisManager(db=redis_db)
     
+    classifier = m.r.get('trained_classifier') #retrieve the trained classifier
+    classifier = m.pickle_load(classifier)
+
     if not classifier:
-        print("test needs a classifier")
+        print("Accuracy needs a classifier, have you trained?")
         return
 
     #we want to make sure we are testing on a new set of samples therefore
-    #we use the training_sample_count as our offset and proceed to use the samples
+    #we use the trained_to as our offset and proceed to use the samples
     #thereafter, unless an offset is otherwise specified
-    if not offset:
-        offset = int(rm.r.get('training_sample_count'))
+    trained_to = int(m.r.get('trained_to'))
 
+    if not offset:
+        offset = trained_to 
+ 
+    if test_samples <= 0: #if no testing samples provided use 25% of our training number
+        test_samples = int(trained_to * .25)
+   
+    if not db:
+        db = m.r.get('trained_db') #get our samples database
     samples = get_samples(db, test_samples, offset=offset)
    
     testfeats = []
-    feat_ex = extractor()
+    trained_ext = m.r.get('trained_extractor')
+    
+    feat_ex = get_extractor(trained_ext)()
 
     #normalization and extraction
     for text, label in samples:
@@ -51,15 +64,14 @@ def test(db, test_samples, classifier='naivebayes', extractor=WordExtractor, neu
 
         if bag_of_words:
             testfeats.append((bag_of_words, label))
-
-    print testfeats[:5]
-
+    
     nltk_accuracy = nltk.classify.util.accuracy(classifier, gold=testfeats) * 100 # percentify
 
     total_guessed = 0
     total_correct = 0
+    total_incorrect = 0
     
-    g = Guesser(extractor=extractor)
+    g = Guesser(extractor=trained_ext)
     
     for text, label in samples:
         guessed = g.guess(text)
@@ -68,23 +80,37 @@ def test(db, test_samples, classifier='naivebayes', extractor=WordExtractor, neu
         
         if (guessed > 0) == label.startswith('pos'):
             total_correct += 1
-        
+        else:
+            #print text, label, guessed
+            total_incorrect += 1
+
         total_guessed += 1
    
     assert total_guessed, "There were no guesses, make sure you've trained on the same database you're testing."
-    
+   
+    #print "total correct:", total_correct
+    #print "total incorrect:", total_incorrect
+    #print "total guessed:", total_guessed
+
     manual_accuracy =  total_correct * 100.0 / total_guessed
 
     return nltk_accuracy, manual_accuracy, classifier
 
 if __name__ == "__main__":
-    #example test on 5000samples
-    test_samples = 25000 
+    #example accuracy
+    import time
 
-    print("Testing on {} samples.".format(test_samples))
-    n_accur, m_accur, c = test(test_samples, neutral_range=0.2)
+    neutral_range = 0.2
+    redis_db      = 4
+
+    print("Testing accuracy with neutral range: {}.".format(neutral_range))
+    start = time.time() 
+    
+    n_accur, m_accur, c = test_accuracy(neutral_range=neutral_range, redis_db=redis_db)
 
     c.show_most_informative_features(30)
 
     print("NLTK Accuracy: {}".format(n_accur))
     print("Manual Accuracy: {}".format(m_accur))
+
+    print("Successfully tested in {} seconds.".format(time.time() - start))
