@@ -4,6 +4,17 @@
 from nltk.corpus import stopwords
 from synt.utils.db import RedisManager
 
+def get_extractor(name):
+    extractors = {
+        'words'     : WordExtractor,
+        'stopwords' : StopWordExtractor,
+        'bestwords' : BestWordExtractor,
+    }
+    try:
+        return extractors[name]
+    except KeyError:
+        return 
+
 class WordExtractor(object):
      
     def extract(self, words, as_list=False):
