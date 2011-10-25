@@ -2,42 +2,41 @@
 from nltk import FreqDist, ELEProbDist
 from utils.db import RedisManager, get_samples, db_exists
 from collections import defaultdict
-from synt.utils.extractors import WordExtractor, BestWordExtractor
-from synt import settings
+from synt.utils.extractors import get_extractor
+from synt import config
 
-#def build_classifier():
-#    pass
-
-def train(db, samples=200000, classifier='naivebayes', extractor=WordExtractor, best_features=10000, processes=8, purge=False, redis_db=5):
+def train(db, samples=200000, classifier='naivebayes', extractor='words', best_features=10000, processes=8, purge=False, redis_db=5):
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
 
-    Argguments:
-    db              -- the training database to use
+    Arguments:
+    db              -- the name of the training database to use stored in ~/.synt
 
     Keyword arguments:
     samples         -- the amount of samples to train on
     classifier      -- the type of classifier to use NOTE: currently only naivebayes is supported
+    extractor       -- the extractor to use, available extraots are 'words', 'stopwords', 'bestwords'
     best_features   -- amount of highly informative features to store
     processes       -- will be used for counting features in parallel 
-    redis_db        -- the redis_db to use 
+    redis_db        -- the redis database to use 
     """
+   
+    _extractor = get_extractor(extractor)
     
     if not (db_exists(db) or samples <= 0):
         return
 
     m = RedisManager(db=redis_db, purge=purge) 
 
-    m.r.set('training_sample_count', samples)
-
     if classifier in m.r.keys():
         print("Classifier exists in Redis. Purge to re-train.")
         return
 
-    _classifier = settings.CLASSIFIERS.get(classifier, None)
+    _classifier = config.CLASSIFIERS.get(classifier, None)
     if not _classifier: #not supported 
         return
 
+    #get training samples from database 
     train_samples = get_samples(db, samples)
 
     m.store_feature_counts(train_samples, processes=processes)
@@ -59,7 +58,7 @@ def train(db, samples=200000, classifier='naivebayes', extractor=WordExtractor, 
     labels = conditional_fd.conditions()
     
     #feature extraction
-    feat_ex = extractor()
+    feat_ex = _extractor()
     extracted_set = set([feat_ex.extract(conditional_fd[label].keys(), as_list=True) for label in labels][0])  
 
     for label in labels:
@@ -68,7 +67,7 @@ def train(db, samples=200000, classifier='naivebayes', extractor=WordExtractor, 
             trues = conditional_fd[label][fname] #is the count it happened
             falses = samples - trues
             feature_freqdist[label, fname].inc(True, trues)
-            feature_freqdist[label, fname].inc(False,falses)
+            feature_freqdist[label, fname].inc(False, falses)
 
     # Create the P(label) distribution
     estimator = ELEProbDist
@@ -80,21 +79,27 @@ def train(db, samples=200000, classifier='naivebayes', extractor=WordExtractor, 
         probdist = estimator(freqdist, bins=2) 
         feature_probdist[label,fname] = probdist
     
-    #NOTE: naivebayes supports this prototype, future classifiers will most likely not
+    #TODO: naivebayes supports this prototype, future classifiers will most likely not
+    #support various classifiers
     _c = _classifier(label_probdist, feature_probdist) 
     
-    #TODO: support various classifiers
-    m.store_classifier(classifier, _c)
+    m.pickle_store(classifier, _c)
+    m.r.set('trained_to', samples)
+    m.r.set('trained_db', db)
+    m.r.set('trained_classifier', classifier)
+    m.r.set('trained_extractor', extractor)
 
 if __name__ == "__main__":
     #example train
     import time
 
-    db = 'samples.db'
-    samples = 1000 
+    db            = 'samples.db'
+    samples       = 10000
     best_features = 5000 
-    processes = 8
-    purge = True
+    processes     = 8
+    purge         = True
+    extractor     = 'words' 
+    redis_db      = 5
 
     print("Beginning train on {} samples using '{}' db..".format(samples, db))
     start = time.time()
@@ -102,8 +107,9 @@ if __name__ == "__main__":
             db            = db, 
             samples       = samples,
             best_features = best_features,
+            extractor     = extractor,
             processes     = processes,
             purge         = purge,
+            redis_db      = redis_db,
     )
-
     print("Successfully trained in {} seconds.".format(time.time() - start))
