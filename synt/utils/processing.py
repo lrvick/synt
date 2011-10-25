@@ -2,7 +2,7 @@
 """Tools to deal with multi-processing."""
 import multiprocessing
 
-def batch_job(producer, consumer, chunksize=10000, processes=None):
+def batch_job(producer, consumer, chunksize=10000, processes=None, **consumer_args):
     """
     Call consumer on everything that is produced from producer, using a pool.
 
@@ -47,7 +47,7 @@ def batch_job(producer, consumer, chunksize=10000, processes=None):
                 finished = True
                 break
             
-            pool.apply_async(consumer, [samples])
+            pool.apply_async(consumer, [samples], consumer_args)
             
 
             offset += len(samples)
