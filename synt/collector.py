@@ -9,7 +9,7 @@ from synt.utils.db import db_init
 from synt import config
 from kral import stream
 
-def collect(db=None, commit_every=200, max_collect=100000):
+def collect(db=None, commit_every=1000, max_collect=400000, queries_file=''):
     """
     Will continuously populate the sample database if it exists
     else it will create a new one.
@@ -18,6 +18,14 @@ def collect(db=None, commit_every=200, max_collect=100000):
     db              -- can take a custom db name to save as
     commit_every    -- commit to sqlite after commit_every executes
     max_collect     -- will stop collecting at this number
+    queries_file    -- if queries file is provided should be a path to a text file
+                       containing the queries in the format:
+                        
+                        label 
+                        query1
+                        query2
+                        query3
+                        queryN
     """
  
     if not db:
@@ -28,10 +36,20 @@ def collect(db=None, commit_every=200, max_collect=100000):
     db = db_init(db=db)
     cursor = db.cursor()
 
-    queries = {
-        ':)' : 'positive',
-        ':(' : 'negative',
-    }
+    queries = {}
+    if queries_file:
+        try:
+            f = open(queries_file)
+            words = [line.strip() for line in f.readlines()]
+            label = words[0]
+            for w in words:
+                queries[w] = label
+        except IOError:
+            pass
+
+    else:
+        queries[':)'] =  'positive'
+        queries[':('] =  'negative'
 
     #collect on twitter with kral
     g = stream(query_list=queries.keys(), service_list="twitter") 
@@ -42,6 +60,7 @@ def collect(db=None, commit_every=200, max_collect=100000):
         text = unicode(item['text'])
      
         sentiment = queries.get(item['query'], None)
+        print item['query'], sentiment
 
         if sentiment:
             try:
@@ -52,7 +71,11 @@ def collect(db=None, commit_every=200, max_collect=100000):
                     print("Commited {}".format(commit_every))
                 if c == max_collect:
                     break
+<<<<<<< Updated upstream
                 
+=======
+                #print("Collected {} samples to database for sentiment {}.".format(c, sentiment))
+>>>>>>> Stashed changes
             except IntegrityError:
                 continue 
     
@@ -138,7 +161,9 @@ def fetch(db):
 
 if __name__ == '__main__':
     max_collect = 2000000
-    commit_every = 1000
+    commit_every = 500
+    f = 'negwords.txt'
+    db = 'filtered_words.db'
 
-    collect(commit_every = commit_every, max_collect = max_collect)
+    collect(db=db, commit_every = commit_every, max_collect = max_collect, queries_file=f)
 
