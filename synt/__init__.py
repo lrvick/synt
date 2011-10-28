@@ -130,6 +130,11 @@ def main():
         help="Test accuracy of classifier.",
     )
     accuracy_parser.add_argument(
+        '--db',
+        default='',
+        help="""The samples database to use, if left empty the same database that was used for training is used for testing (with fresh samples). Specify db with with a database name located in ~/.synt.""",
+    )
+    accuracy_parser.add_argument(
         '--test_samples', 
         type=int,
         help="""The amount of samples to test on. By default this is figured out internally and ammounts to 25% 
@@ -221,6 +226,7 @@ def main():
         start = time.time()
         
         n_accur, m_accur, classifier = test_accuracy(
+            db            = args.db,
             test_samples  = args.test_samples,
             neutral_range = args.neutral_range,
             offset        = args.offset,
