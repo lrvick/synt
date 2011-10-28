@@ -162,7 +162,7 @@ def main():
     if args.parser == 'train':
         print("Beginning train on {} database with {} samples.".format(args.db, args.samples))
         
-        start = time.now()
+        start = time.time()
         
         purge = False
         if args.purge == 'yes':
