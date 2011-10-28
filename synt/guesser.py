@@ -5,7 +5,7 @@ from synt.utils.text import normalize_text
 
 class Guesser(object):
     
-    def __init__(self, classifier='naivebayes', extractor='words', redis_db=5):
+    def __init__(self, classifier='naivebayes', extractor='stopwords', redis_db=5):
         
         self.classifier = RedisManager(db=redis_db).pickle_load(classifier) 
         self.extractor = get_extractor(extractor)()
