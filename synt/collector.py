@@ -71,12 +71,7 @@ def collect(db=None, commit_every=1000, max_collect=400000, queries_file=''):
                     print("Commited {}".format(commit_every))
                 if c == max_collect:
                     break
-<<<<<<< Updated upstream
-                
-=======
-                #print("Collected {} samples to database for sentiment {}.".format(c, sentiment))
->>>>>>> Stashed changes
-            except IntegrityError:
+            except IntegrityError: #skip duplicates
                 continue 
     
     db.close()
