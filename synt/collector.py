@@ -9,16 +9,16 @@ from synt.utils.db import db_init
 from synt import config
 from kral import stream
 
-def collect(db=None, commit_every=1000, max_collect=400000, queries_file=''):
+def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
     """
     Will continuously populate the sample database if it exists
     else it will create a new one.
     
     Keyword Arguments:
-    db              -- can take a custom db name to save as
-    commit_every    -- commit to sqlite after commit_every executes
-    max_collect     -- will stop collecting at this number
-    queries_file    -- if queries file is provided should be a path to a text file
+    db_name         -- Custom name for database.
+    commit_every    -- Commit to sqlite after commit_every executes.
+    max_collect     -- Will stop collecting at this number.
+    queries_file    -- If queries file is provided should be a path to a text file
                        containing the queries in the format:
                         
                         label 
@@ -28,15 +28,16 @@ def collect(db=None, commit_every=1000, max_collect=400000, queries_file=''):
                         queryN
     """
  
-    if not db:
+    if not db_name:
         d = datetime.datetime.now()
         #if no dbname is provided we'll store a timestamped db name
-        db = "samples-%s-%s-%s.db" % (d.year, d.month, d.day)
+        db_name = "samples-%s-%s-%s.db" % (d.year, d.month, d.day)
 
-    db = db_init(db=db)
+    db = db_init(db=db_name)
     cursor = db.cursor()
 
     queries = {}
+
     if queries_file:
         try:
             f = open(queries_file)
@@ -60,7 +61,6 @@ def collect(db=None, commit_every=1000, max_collect=400000, queries_file=''):
         text = unicode(item['text'])
      
         sentiment = queries.get(item['query'], None)
-        print item['query'], sentiment
 
         if sentiment:
             try:
@@ -92,11 +92,14 @@ def import_progress():
         print("Processed %s of 40423300 records (%0.2f%%)" % (prcount,percent))
     return 0
 
-def fetch(db):
+def fetch(db_name='samples.db'):
     """
-    Pre-populates training database from public archive of ~2mil tweets
+    Pre-populates training database from public archive of ~2mil tweets.
+    Stores training database as db_name in ~/.synt/
     
-    Stores training database as 'db' in ~/.synt/
+    Keyword Arguments:
+    db_name         -- Custom name for database. 
+    
     """
     
     response = urllib2.urlopen('https://github.com/downloads/Tawlk/synt/sample_data.bz2')
@@ -110,12 +113,12 @@ def fetch(db):
 
     decompressor = bz2.BZ2Decompressor()
 
-    fp = os.path.join(os.path.expanduser(config.DB_PATH), db)
+    fp = os.path.join(os.path.expanduser(config.DB_PATH), db_name)
 
     if os.path.exists(fp):
         os.remove(fp)
 
-    db = db_init(db=db, create=False)
+    db = db_init(db=db_name, create=False)
     db.set_progress_handler(import_progress,20)
 
     while True:
@@ -157,8 +160,7 @@ def fetch(db):
 if __name__ == '__main__':
     max_collect = 2000000
     commit_every = 500
-    f = 'negwords.txt'
-    db = 'filtered_words.db'
+    qf = 'negwords.txt'
 
-    collect(db=db, commit_every = commit_every, max_collect = max_collect, queries_file=f)
+    collect(commit_every = commit_every, max_collect = max_collect, queries_file=qf)
 

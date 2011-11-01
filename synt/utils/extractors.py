@@ -4,14 +4,14 @@
 from nltk.corpus import stopwords
 from synt.utils.db import RedisManager
 
-def get_extractor(name):
+def get_extractor(type):
     extractors = {
         'words'     : WordExtractor,
         'stopwords' : StopWordExtractor,
         'bestwords' : BestWordExtractor,
     }
     try:
-        return extractors[name]
+        return extractors[type]
     except KeyError:
         return 
 

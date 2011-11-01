@@ -24,7 +24,7 @@ def main():
         help='Train a classifier.'
     )
     train_parser.add_argument(
-        'db', 
+        'db_name', 
         help="The name of the training database to use. They are stored/retreived from ~/.synt/"
     )
     train_parser.add_argument(
@@ -33,13 +33,13 @@ def main():
         help="The amount of samples to train on. Uses the samples.db",
     )
     train_parser.add_argument(
-        '--classifier',
+        '--classifier_type',
         default='naivebayes',
         choices=('naivebayes',),
         help="The classifier to use. See help for currently supported classifier.",
     )
     train_parser.add_argument(
-        '--extractor',
+        '--extractor_type',
         default='stopwords',
         choices=('words', 'stopwords', 'bestwords'),
         help="The feature extractor to use. By default this uses stopwords filtering.",
@@ -74,7 +74,7 @@ def main():
         help='Collect samples.'
     )
     collect_parser.add_argument(
-        '--db',
+        '--db_name',
         default=None,
         help="Optional database name to store as.",
     )
@@ -97,7 +97,7 @@ def main():
         help='Fetches premade sample database.'
     )
     fetch_parser.add_argument(
-        '--db', 
+        '--db_name', 
         help="Fetches the default samples database from github and stores it as 'db' in ~/.synt/. Default db name is 'samples.db'.",
         default='samples.db',
     )
@@ -130,14 +130,14 @@ def main():
         help="Test accuracy of classifier.",
     )
     accuracy_parser.add_argument(
-        '--db',
+        '--db_name',
         default='',
         help="""The samples database to use, if left empty the same database that was used for training is used for testing (with fresh samples). Specify db with with a database name located in ~/.synt.""",
     )
     accuracy_parser.add_argument(
         '--test_samples', 
         type=int,
-        help="""The amount of samples to test on. By default this is figured out internally and ammounts to 25% 
+        help="""The amount of samples to test on. By default this is figured out internally and amounts to 25%% 
         of the training sample count. You can override this.""",
         default=0,
     )
@@ -145,7 +145,7 @@ def main():
         '--neutral_range',
         default=0.2,
         type=float,
-        help="Neutral range to use. By default there isn't one.",
+        help="Neutral range to use. By default this is 0.2.",
     )
     accuracy_parser.add_argument(
         '--offset',
@@ -165,7 +165,7 @@ def main():
     args = parser.parse_args()
 
     if args.parser == 'train':
-        print("Beginning train on {} database with {} samples.".format(args.db, args.samples))
+        print("Beginning train on {} database with {} samples.".format(args.db_name, args.samples))
         
         start = time.time()
         
@@ -174,25 +174,25 @@ def main():
             purge = True
 
         train(
-            db            = args.db,
-            samples       = args.samples,
-            classifier    = args.classifier,
-            extractor     = args.extractor,
-            best_features = args.best_features,
-            processes     = args.processes,
-            purge         = purge,
-            redis_db      = args.redis_db, 
+            db_name         = args.db_name,
+            samples         = args.samples,
+            classifier_type = args.classifier_type,
+            extractor_type  = args.extractor_type,
+            best_features   = args.best_features,
+            processes       = args.processes,
+            purge           = purge,
+            redis_db        = args.redis_db, 
         )
         
         print("Finished training in {}.".format(time.time() - start))
 
     elif args.parser == 'collect':
-        print("Beginning collecting {} samples to {}.".format(args.max_collect, args.db))
+        print("Beginning collecting {} samples to {}.".format(args.max_collect, args.db_name))
         
         start = time.time() 
         
         collect(
-            db           = args.db,
+            db_name      = args.db_name,
             commit_every = args.commit_every,
             max_collect  = args.max_collect,
         )    
@@ -200,8 +200,8 @@ def main():
         print("Finished collecting samples in {} seconds.".format(time.time() - start))
 
     elif args.parser == 'fetch':
-        print("Beginning fetch to '{}' database.".format(args.db)) 
-        fetch(args.db)
+        print("Beginning fetch to '{}' database.".format(args.db_name)) 
+        fetch(args.db_name)
         print("Finished fetch.")
 
     elif args.parser == 'guess':
@@ -226,7 +226,7 @@ def main():
         start = time.time()
         
         n_accur, m_accur, classifier = test_accuracy(
-            db            = args.db,
+            db_name       = args.db_name,
             test_samples  = args.test_samples,
             neutral_range = args.neutral_range,
             offset        = args.offset,

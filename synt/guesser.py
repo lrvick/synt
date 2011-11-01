@@ -5,20 +5,29 @@ from synt.utils.text import normalize_text
 
 class Guesser(object):
     
-    def __init__(self, classifier='naivebayes', extractor='stopwords', redis_db=5):
-        
-        self.classifier = RedisManager(db=redis_db).pickle_load(classifier) 
-        self.extractor = get_extractor(extractor)()
+    def __init__(self, classifier_type='naivebayes', extractor_type='stopwords', redis_db=5):
+        self.classifier_type = classifier_type
+        self.redis_db = redis_db
+        self.extractor = get_extractor(extractor_type)()
         self.normalizer = normalize_text
-    
+   
+    def _get_classifier(self):
+        print("Retrieving classifier ...")
+        self._classifier = RedisManager(db=self.redis_db).pickle_load(self.classifier_type) 
+
     def guess(self, text):
         """
         Takes text and returns the sentiment score between -1 and 1.
         """
         
-        if not self.classifier:
-            print("guess needs a classifier.")
-            return
+        try:
+            classifier = self._classifier
+        except AttributeError:
+            self._get_classifier()
+            classifier = self._classifier
+            if not classifier:
+                print("guess needs a classifier, make sure you're using a supported classifier and you've trained.")
+                return
 
         tokens = self.normalizer(text)
       
@@ -28,18 +37,18 @@ class Guesser(object):
         
         if bag_of_words:
             
-            prob = self.classifier.prob_classify(bag_of_words)
+            prob = classifier.prob_classify(bag_of_words)
             
             #return a -1 .. 1 score
             score = prob.prob('positive') - prob.prob('negative')
            
             #if score doesn't fall within -1 and 1 return 0.0 
             if not (-1 <= score <= 1):
-                pass #score 0.0
+                pass 
 
         return score
 
-guess = Guesser()
+guess = Guesser().guess
 
 if __name__ == '__main__':
     #example usage of guess

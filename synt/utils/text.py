@@ -34,10 +34,6 @@ def normalize_text(text):
 
     text = text.lower()
     
-    #for e in config.EMOTICONS:
-        #text = text.replace(e, '') #remove emoticons
-        
-
     format_pats = (
         ("@[A-Za-z0-9_]+", ''), #remove re-tweets 
         ("#[A-Za-z0-9_]+", ''), #remove hash tags
@@ -58,7 +54,6 @@ def normalize_text(text):
     if _tmp:
         text += ' '.join([e for e in _tmp]) #attach emoticons back
    
-
     if text:
         #tokenize on words longer than 1 char
         words = [w for w in WhitespaceTokenizer().tokenize(text) if len(w) > 1]

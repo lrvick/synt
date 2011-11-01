@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Functions to interact with databases."""
+"""Tools to interact with databases."""
+
 import os
 import sqlite3
 import redis
@@ -11,11 +12,16 @@ from synt.utils.processing import batch_job
 from synt import config
 
 def db_exists(name):
+    """
+    Returns true if the database exists in our path defined by DB_PATH.
+    """
     path = os.path.join(os.path.expanduser(config.DB_PATH), name)
     return True if os.path.exists(path) else False
     
 def db_init(db='samples.db', create=True):
-    """Initializes the sqlite3 database."""
+    """
+    Initializes the sqlite3 database.
+    """
     if not os.path.exists(os.path.expanduser(config.DB_PATH)):
         os.makedirs(os.path.expanduser(config.DB_PATH))
 
@@ -33,7 +39,7 @@ def db_init(db='samples.db', create=True):
 
 def redis_feature_consumer(samples, db=None):
     """
-    Stores counts to redis via a pipeline.
+    Stores feature and counts to redis via a pipeline.
     """
  
     rm = RedisManager(db=db)
@@ -68,11 +74,30 @@ class RedisManager(object):
         self.db = db
         if purge: self.r.flushdb()
 
+    def store_feature_counts(self, samples, chunksize=10000, processes=None):
+        """
+        Stores feature:count histograms for samples in Redis with the ability to increment.
+       
+        Arguments:
+        samples             -- List of samples in the format (text, label)
+
+        Keyword Arguments:
+        chunksize           -- Amount of samples to process at a time.
+        processes           -- Amount of processors to use with multiprocessing.  
+        
+        """
+
+        if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
+            return
+
+        #do this with multiprocessing
+        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, db=self.db)
 
     def store_freqdists(self):
         """
-        Store features with counts to Redis.
+        Build NLTK frequency distributions based on feature counts and store them to Redis.
         """
+        #TODO: this step and the above may possibly be combined
 
         word_fd = FreqDist()
         label_word_freqdist = ConditionalFreqDist()
@@ -93,35 +118,10 @@ class RedisManager(object):
 
         self.pickle_store('word_fd', word_fd)
         self.pickle_store('label_fd', label_word_freqdist)
-        
-
-    def store_feature_counts(self, samples, chunksize=10000, processes=None):
-        """
-        Stores feature:count histograms for samples in Redis with the ability to increment.
-       
-        Arguments:
-        samples             -- a list of samples in the format (text, label)
-
-        Keyword Arguments:
-        chunksize           -- the amount of samples to process at a time
-        processes           -- the amount of processors to use with multiprocessing  
-        """
-
-        if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
-            return
-
-        #def producer(offset, length):
-        #    if offset + length > samples:
-        #        length = samples - offset
-        #    if length < 1:
-        #        return []
-        #    return get_samples(length, offset=offset)
-
-        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, db=self.db)
-        
+    
     def store_feature_scores(self):
         """
-        Stores feature scores to Redis.
+        Determine the scores of words based on chi-sq and stores word:score to Redis.
         """
         
         try:
@@ -147,18 +147,10 @@ class RedisManager(object):
       
         self.pickle_store('word_scores', word_scores)
 
-    def pickle_store(self, name, data):
-        dump = pickle.dumps(data, protocol=1) #highest_protocol breaks somethign in nltk
-        self.r.set(name, dump)
-
-    def pickle_load(self, name):
-        try:
-            return pickle.loads(self.r.get(name))
-        except TypeError:
-            return
-
     def store_best_features(self, n=10000):
-        """Store n best features to Redis."""
+        """
+        Store n best features determined by scores to Redis.
+        """
         if not n: return
 
         word_scores = self.pickle_load('word_scores')
@@ -177,6 +169,16 @@ class RedisManager(object):
 
         if best_words:
             return set([word for word,score in best_words])
+
+    def pickle_store(self, name, data):
+        dump = pickle.dumps(data, protocol=1) #highest_protocol breaks with NLTKs FreqDist
+        self.r.set(name, dump)
+
+    def pickle_load(self, name):
+        try:
+            return pickle.loads(self.r.get(name))
+        except TypeError:
+            return
 
 def get_sample_limit(db='samples.db'):
     """
@@ -201,14 +203,13 @@ def get_sample_limit(db='samples.db'):
     else:
         limit = neg_count
     
-    #store to redis
     m.r.set('limit', limit)
     
     return limit
 
 def get_samples(db, limit, offset=0):
     """
-    Returns a combined list of negative and positive samples.
+    Returns a combined list of negative and positive samples in a (text, label) format.
     """
 
     db = db_init(db=db)

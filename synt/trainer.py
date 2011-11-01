@@ -5,39 +5,40 @@ from collections import defaultdict
 from synt.utils.extractors import get_extractor
 from synt import config
 
-def train(db, samples=200000, classifier='naivebayes', extractor='words', best_features=10000, processes=8, purge=False, redis_db=5):
+def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type='words', 
+    best_features=10000, processes=8, purge=False, redis_db=5):
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
 
     Arguments:
-    db              -- the name of the training database to use stored in ~/.synt
+    db_name         -- Name of the training database to use stored in ~/.synt
 
     Keyword arguments:
-    samples         -- the amount of samples to train on
-    classifier      -- the type of classifier to use NOTE: currently only naivebayes is supported
-    extractor       -- the extractor to use, available extraots are 'words', 'stopwords', 'bestwords'
-    best_features   -- amount of highly informative features to store
-    processes       -- will be used for counting features in parallel 
-    redis_db        -- the redis database to use 
+    samples         -- Amount of samples to train on.
+    classifier_type -- Type of classifier to use. Available classifiers are 'naivebayes'.
+    extractor_type  -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'.
+    best_features   -- Amount of highly informative features to store.
+    processes       -- The amount of processes to be used for counting features in parallel.
+    redis_db        -- Redis database to use for Redis Manager.
     """
    
-    _extractor = get_extractor(extractor)
+    extractor = get_extractor(extractor_type)
     
-    if not (db_exists(db) or samples <= 0):
+    if not (db_exists(db_name) or samples <= 0):
         return
 
     m = RedisManager(db=redis_db, purge=purge) 
 
-    if classifier in m.r.keys():
+    if classifier_type in m.r.keys():
         print("Classifier exists in Redis. Purge to re-train.")
         return
 
-    _classifier = config.CLASSIFIERS.get(classifier, None)
-    if not _classifier: #not supported 
+    classifier = config.CLASSIFIERS.get(classifier_type, None)
+    if not classifier: #classifier not supported 
         return
 
-    #get training samples from database 
-    train_samples = get_samples(db, samples)
+    #retrieve training samples from database
+    train_samples = get_samples(db_name, samples)
 
     m.store_feature_counts(train_samples, processes=processes)
     m.store_freqdists()
@@ -49,6 +50,7 @@ def train(db, samples=200000, classifier='naivebayes', extractor='words', best_f
     label_freqdist = FreqDist()
     feature_freqdist = defaultdict(FreqDist)
 
+    #retreieve the actual samples processed for label
     neg_processed, pos_processed = m.r.get('negative_processed'), m.r.get('positive_processed')
     label_freqdist.inc('negative', int(neg_processed))
     label_freqdist.inc('positive', int(pos_processed))
@@ -58,56 +60,56 @@ def train(db, samples=200000, classifier='naivebayes', extractor='words', best_f
     labels = conditional_fd.conditions()
     
     #feature extraction
-    feat_ex = _extractor()
+    feat_ex = extractor()
     extracted_set = set([feat_ex.extract(conditional_fd[label].keys(), as_list=True) for label in labels][0])  
 
+    #increment the amount of times a given feature for label occured and fill in the missing occurences with Falses
     for label in labels:
         samples = label_freqdist[label]
         for fname in extracted_set:
-            trues = conditional_fd[label][fname] #is the count it happened
+            trues = conditional_fd[label][fname] 
             falses = samples - trues
             feature_freqdist[label, fname].inc(True, trues)
             feature_freqdist[label, fname].inc(False, falses)
 
-    # Create the P(label) distribution
+    #create the P(label) distribution
     estimator = ELEProbDist
     label_probdist = estimator(label_freqdist)
     
-    # Create the P(fval|label, fname) distribution
+    #create the P(fval|label, fname) distribution
     feature_probdist = {}
     for ((label, fname), freqdist) in feature_freqdist.items():
         probdist = estimator(freqdist, bins=2) 
         feature_probdist[label,fname] = probdist
     
     #TODO: naivebayes supports this prototype, future classifiers will most likely not
-    #support various classifiers
-    _c = _classifier(label_probdist, feature_probdist) 
-    
-    m.pickle_store(classifier, _c)
+    trained_classifier = classifier(label_probdist, feature_probdist) 
+   
+    m.pickle_store(classifier_type, trained_classifier)
     m.r.set('trained_to', samples)
-    m.r.set('trained_db', db)
-    m.r.set('trained_classifier', classifier)
-    m.r.set('trained_extractor', extractor)
+    m.r.set('trained_db', db_name)
+    m.r.set('trained_classifier', classifier_type)
+    m.r.set('trained_extractor', extractor_type)
 
 if __name__ == "__main__":
     #example train
     import time
 
-    db            = 'samples.db'
+    db_name       = 'samples.db'
     samples       = 10000
     best_features = 5000 
     processes     = 8
     purge         = True
     extractor     = 'words' 
-    redis_db      = 5
+    redis_db      = 3
 
     print("Beginning train on {} samples using '{}' db..".format(samples, db))
     start = time.time()
     train(
-            db            = db, 
+            db_name       = db_name, 
             samples       = samples,
             best_features = best_features,
-            extractor     = extractor,
+            extractor_type= extractor,
             processes     = processes,
             purge         = purge,
             redis_db      = redis_db,

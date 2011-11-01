@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tools to deal with multi-processing."""
+
 import multiprocessing
 
 def batch_job(producer, consumer, chunksize=10000, processes=None, **consumer_args):
@@ -7,19 +8,19 @@ def batch_job(producer, consumer, chunksize=10000, processes=None, **consumer_ar
     Call consumer on everything that is produced from producer, using a pool.
 
     Args:
-    producer    -- produces the events that are fed to the consumer.
-    consumer    -- the function called with values recieved from the producer
+    producer    -- Produces the events that are fed to the consumer.
+    consumer    -- Function called with values recieved from the producer.
 
     Keyword Arguments:
-    chunksize   -- how many values to request from the producer
-    processes   -- how many processes should be created to handle jobs
+    chunksize     -- How many values to request from the producer.
+    processes     -- How many processes should be created to handle jobs.
+    consumer_args -- Arguments to pass along to the consumer.
     """
 
     p = producer
 
     if type(producer) in [list,tuple]:
         #replace the list or tuple with a dummy producer function
-        
         def tmp(offset, length):
             """
             A wraper for lists to allow them to be used as producers.
@@ -58,7 +59,6 @@ def batch_job(producer, consumer, chunksize=10000, processes=None, **consumer_ar
 if __name__=="__main__":
     #example usage
    
-
     def producer(offset, length):
         if offset >= 50:
             return []

@@ -19,7 +19,7 @@ class TrainerTestCase(unittest.TestCase):
         self.assertTrue('best_words' in self.man.r.keys())
 
     def test_train_unsupported_classifier(self):
-        self.assertEqual(train('samples.db', classifier='xyz'), None)
+        self.assertEqual(train('samples.db', classifier_type='xyz'), None)
 
     def test_train_bad_samples(self):
         self.assertEqual(train('samples.db', -2000), None)
@@ -34,7 +34,7 @@ class GuesserTestCase(unittest.TestCase):
 
     def setUp(self):
         self.man = RedisManager(db=10) #testing db
-        train('samples.db', 1000, classifier='naivebayes', purge=True)
+        train('samples.db', 1000, classifier_type='naivebayes', purge=True)
         self.g = Guesser().guess
 
     def test_guess_with_text(self):
