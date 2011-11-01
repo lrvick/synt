@@ -58,7 +58,7 @@ the -h flag to get help on any particular command and see more options.
     the desired number of items.
 
     ```bash
-    synt collect --max_collect 10000 --db 'db_name' 
+    synt collect --max_collect 10000 --db_name 'awesome.db' 
     ```
     
     **Note:** You can also increment samples in a database by providing the
@@ -111,7 +111,7 @@ the -h flag to get help on any particular command and see more options.
     a prompt:
 
     ```bash
-    synt guess --text "i love ponies" 
+    synt guess --text "i like ponies and rainbows" 
     ```
 
 
