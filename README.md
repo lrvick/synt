@@ -18,7 +18,7 @@
   * Can train a classifier based on a samples database 
   * Can classifiy text and output a score between -1 and 1. (where -1 is
     negative, +1 is positive and anything close to 0 can be considered neutral)
-  * abilitiy to collect, train, guess, and test (accuracy) with from cli 
+  * abilitiy to collect, train, guess, and test (accuracy) from cli 
 
 
 ## Requirements ##
@@ -30,7 +30,7 @@
     python3.x)
     * sqlite3 issue was fixed in 2.7 [issue](http://code.google.com/p/pysqlite/source/detail?r=9e3fa82223b89ca4e7f9eadedc1297ab5c3eebd9)
     * argparse
-  * PyYAML (pip install pyyaml)
+  * [PyYAML](http://pyyaml.org/) (pip install pyyaml)
     * unfortnatley nltk requires pyyaml before it can be installed [bug](http://code.google.com/p/nltk/issues/detail?id=508)
 
 
@@ -48,14 +48,13 @@ the -h flag to get help on any particular command and see more options.
   2. Grab the sample database to train on (or build one (below)):
 
     ```bash
-    synt fetch
+    synt fetch --db_name "mysamples.db"
     ```
     
-    By default it will be stored as 'samples.db' but you can override this by
-    providing the --db argument.
+    By default it will be stored as 'samples.db'.
 
     If you'd prefer to build a fresh sample db and have the time, just run collect with
-    the desired number of items.
+    the desired amount.
 
     ```bash
     synt collect --max_collect 10000 --db_name 'awesome.db' 
@@ -73,7 +72,7 @@ the -h flag to get help on any particular command and see more options.
     synt train 'samples.db' 20000 
     ```
     
-    Train takes two required arguments: a training database (it's name), and the amount of
+    Train takes two required arguments: a training database (name), and the amount of
     samples to train on.  
 
 
