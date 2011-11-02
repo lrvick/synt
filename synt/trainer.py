@@ -11,31 +11,30 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     Train with samples from sqlite database and stores the resulting classifier in Redis.
 
     Arguments:
-    db_name         -- Name of the training database to use stored in ~/.synt
+    db_name         -- Name of the training database to use stored in ~/.synt (string)
 
     Keyword arguments:
-    samples         -- Amount of samples to train on.
-    classifier_type -- Type of classifier to use. Available classifiers are 'naivebayes'.
-    extractor_type  -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'.
-    best_features   -- Amount of highly informative features to store.
-    processes       -- The amount of processes to be used for counting features in parallel.
-    redis_db        -- Redis database to use for Redis Manager.
+    samples         -- Amount of samples to train on. (int)
+    classifier_type -- Type of classifier to use. Available classifiers are 'naivebayes'. (string)
+    extractor_type  -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'. (string)
+    best_features   -- Amount of highly informative features to store. (int)
+    processes       -- The amount of processes to be used for counting features in parallel. (int)
+    redis_db        -- Redis database to use for Redis Manager. (int)
     """
-   
-    extractor = get_extractor(extractor_type)
-    
-    if not (db_exists(db_name) or samples <= 0):
-        return
-
     m = RedisManager(db=redis_db, purge=purge) 
+    
+    extractor = get_extractor(extractor_type)
+
+    if not db_exists(db_name):
+        raise ValueError("Database '%s' does not exist." % db_name)
 
     if classifier_type in m.r.keys():
         print("Classifier exists in Redis. Purge to re-train.")
         return
 
-    classifier = config.CLASSIFIERS.get(classifier_type, None)
+    classifier = config.CLASSIFIERS.get(classifier_type)
     if not classifier: #classifier not supported 
-        return
+        raise ValueError("Classifier '%s' not supported." % classifier_type)
 
     #retrieve training samples from database
     train_samples = get_samples(db_name, samples)
@@ -44,7 +43,7 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     m.store_freqdists()
     m.store_feature_scores()
    
-    if best_features:
+    if best_features and best_features > 1:
         m.store_best_features(best_features)
 
     label_freqdist = FreqDist()

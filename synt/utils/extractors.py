@@ -13,7 +13,7 @@ def get_extractor(type):
     try:
         return extractors[type]
     except KeyError:
-        return 
+        raise KeyError("Extractor of type %s doesn't exist." % type)
 
 class WordExtractor(object):
      

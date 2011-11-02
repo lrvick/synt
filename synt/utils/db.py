@@ -72,7 +72,8 @@ class RedisManager(object):
     def __init__(self, db=5, host='localhost', purge=False):
         self.r = redis.Redis(db=db, host=host)
         self.db = db
-        if purge: self.r.flushdb()
+        if purge is True:
+            self.r.flushdb()
 
     def store_feature_counts(self, samples, chunksize=10000, processes=None):
         """
