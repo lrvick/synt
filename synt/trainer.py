@@ -11,15 +11,15 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     Train with samples from sqlite database and stores the resulting classifier in Redis.
 
     Arguments:
-    db_name         -- Name of the training database to use stored in ~/.synt (string)
+    db_name (str) -- Name of the training database to use stored in ~/.synt 
 
     Keyword arguments:
-    samples         -- Amount of samples to train on. (int)
-    classifier_type -- Type of classifier to use. Available classifiers are 'naivebayes'. (string)
-    extractor_type  -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'. (string)
-    best_features   -- Amount of highly informative features to store. (int)
-    processes       -- The amount of processes to be used for counting features in parallel. (int)
-    redis_db        -- Redis database to use for Redis Manager. (int)
+    samples (int) -- Amount of samples to train on.
+    classifier_type (str) -- Type of classifier to use. Available classifiers are 'naivebayes'.
+    extractor_type (str) -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'.
+    best_features (int) -- Amount of highly informative features to store.
+    processes (int) -- The amount of processes to be used for counting features in parallel.
+    redis_db (int) -- Redis database to use for Redis Manager.
     """
     m = RedisManager(db=redis_db, purge=purge) 
     
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     extractor     = 'words' 
     redis_db      = 3
 
-    print("Beginning train on {} samples using '{}' db..".format(samples, db))
+    print("Beginning train on {} samples using '{}' db..".format(samples, db_name))
     start = time.time()
     train(
             db_name       = db_name, 

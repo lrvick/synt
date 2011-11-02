@@ -2,7 +2,6 @@
 import unittest
 from synt.trainer import train
 from synt.guesser import Guesser 
-from synt.utils.db import RedisManager
 
 class TrainerTestCase(unittest.TestCase):
 

@@ -14,6 +14,10 @@ from synt import config
 def db_exists(name):
     """
     Returns true if the database exists in our path defined by DB_PATH.
+    
+    Arguments:
+    name (str) -- Database name.
+
     """
     path = os.path.join(os.path.expanduser(config.DB_PATH), name)
     return True if os.path.exists(path) else False
@@ -21,6 +25,11 @@ def db_exists(name):
 def db_init(db='samples.db', create=True):
     """
     Initializes the sqlite3 database.
+    
+    Keyword Arguments:
+    db (str) -- Name of the database to use.
+    create (bool) -- If creating the database for the first time.
+    
     """
     if not os.path.exists(os.path.expanduser(config.DB_PATH)):
         os.makedirs(os.path.expanduser(config.DB_PATH))
@@ -37,11 +46,16 @@ def db_init(db='samples.db', create=True):
     return conn
 
 
-def redis_feature_consumer(samples, db=None):
+def redis_feature_consumer(samples, **kwargs):
     """
     Stores feature and counts to redis via a pipeline.
     """
- 
+    
+    if 'db' not in kwargs:
+        raise KeyError("Feature consumer requires db.")
+
+    db = kwargs['db']
+
     rm = RedisManager(db=db)
     pipeline = rm.r.pipeline()
 
@@ -80,11 +94,11 @@ class RedisManager(object):
         Stores feature:count histograms for samples in Redis with the ability to increment.
        
         Arguments:
-        samples             -- List of samples in the format (text, label)
+        samples (list) -- List of samples in the format (text, label)
 
         Keyword Arguments:
-        chunksize           -- Amount of samples to process at a time.
-        processes           -- Amount of processors to use with multiprocessing.  
+        chunksize (int) -- Amount of samples to process at a time.
+        processes (int) -- Amount of processors to use with multiprocessing.  
         
         """
 
@@ -92,7 +106,8 @@ class RedisManager(object):
             return
 
         #do this with multiprocessing
-        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, db=self.db)
+        c_args = {'db': self.db}
+        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, consumer_args=c_args)
 
     def store_freqdists(self):
         """
@@ -150,7 +165,11 @@ class RedisManager(object):
 
     def store_best_features(self, n=10000):
         """
-        Store n best features determined by scores to Redis.
+        Stores the best features in Redis.
+
+        Keyword Arguments:
+        n (int) -- Amount of features to store as best features.
+        
         """
         if not n: return
 
@@ -185,6 +204,10 @@ def get_sample_limit(db='samples.db'):
     """
     Returns the limit of samples so that both positive and negative samples
     will remain balanced.
+    
+    Keyword Arguments:
+    db (str) -- Name of the database to use.
+    
     """
 
     #this is an expensive operation in case of a large database
@@ -211,6 +234,14 @@ def get_sample_limit(db='samples.db'):
 def get_samples(db, limit, offset=0):
     """
     Returns a combined list of negative and positive samples in a (text, label) format.
+    
+    Arguments:
+    db (str) -- Name of the databse to use.
+    limit (int) -- Amount of samples to retrieve.
+
+    Keyword Arguments:
+    offset (int) -- Where to start getting samples from.
+    
     """
 
     db = db_init(db=db)

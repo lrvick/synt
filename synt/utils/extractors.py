@@ -5,22 +5,38 @@ from nltk.corpus import stopwords
 from synt.utils.db import RedisManager
 
 def get_extractor(type):
+    """
+    Return the extractor for type.
+    
+    Arguments:
+    type (str) -- A name/type of extractor.
+    
+    """
+
     extractors = {
         'words'     : WordExtractor,
         'stopwords' : StopWordExtractor,
         'bestwords' : BestWordExtractor,
     }
-    try:
-        return extractors[type]
-    except KeyError:
+
+    if type not in extractors:
         raise KeyError("Extractor of type %s doesn't exist." % type)
+    return extractors[type]
 
 class WordExtractor(object):
      
     def extract(self, words, as_list=False):
         """
         Returns a base bag of words.
+        
+        Arguments:
+        words (list) -- A list of words.
+
+        Keyword Arguments:
+        as_list (bool) -- By default we return a dict, unless you want to leave it as a list. 
+        
         """
+        
         if not words: return
         
         if as_list:
@@ -39,7 +55,15 @@ class StopWordExtractor(WordExtractor):
     def extract(self, words, as_list=False):
         """
         Returns a bag of words for words that are not in stop words.
+        
+        Arguments:
+        words (list) -- A list of words.
+
+        Keyword Arguments:
+        as_list (bool) -- By default we return a dict, unless you want to leave it as a list. 
+     
         """
+        
         assert self.stop_words, "This extractor relies on a set of stop words."
         
         if not words: return
@@ -60,7 +84,15 @@ class BestWordExtractor(WordExtractor):
     def extract(self, words, as_list=False):
         """
         Returns a bag of words for words that are in best words.
+        
+        Arguments:
+        words (list) -- A list of words.
+
+        Keyword Arguments:
+        as_list (bool) -- By default we return a dict, unless you want to leave it as a list. 
+     
         """
+        
         assert self.best_words, "This extractor relies on best words."
         
         if not words: return

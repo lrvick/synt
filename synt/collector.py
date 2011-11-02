@@ -15,17 +15,16 @@ def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
     else it will create a new one.
     
     Keyword Arguments:
-    db_name         -- Custom name for database.
-    commit_every    -- Commit to sqlite after commit_every executes.
-    max_collect     -- Will stop collecting at this number.
-    queries_file    -- If queries file is provided should be a path to a text file
-                       containing the queries in the format:
-                        
-                        label 
-                        query1
-                        query2
-                        query3
-                        queryN
+    db_name (str) -- Custom name for database.
+    commit_every (int) -- Commit to sqlite after commit_every executes.
+    max_collect (int) -- Will stop collecting at this number.
+    queries_file (str) -- If queries file is provided should be a path to a text file
+                          containing the queries in the format:
+                          
+                          label 
+                          query1
+                          queryN
+
     """
  
     if not db_name:
@@ -98,7 +97,7 @@ def fetch(db_name='samples.db'):
     Stores training database as db_name in ~/.synt/
     
     Keyword Arguments:
-    db_name         -- Custom name for database. 
+    db_name (str) -- Custom name for database. 
     
     """
     

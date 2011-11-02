@@ -11,7 +11,10 @@ PUNC_MAP = dict([(ord(x),None) for x in string.punctuation])
 def normalize_text(text):
     """
     Formats text to strip unneccesary:words, punctuation and whitespace. Returns a tokenized list.
-   
+  
+    Arguments:
+    text (str) -- Text to process.
+
     >>> text = "ommmmmmg how'r u!? visi t  <html> <a href='http://google.com'> my</a> site @ http://www.coolstuff.com haha"
     >>> normalize_text(text)
     [u'ommg', u'howr', u'visi', u'my', u'site', u'haha']

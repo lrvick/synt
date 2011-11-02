@@ -7,25 +7,29 @@ from synt.guesser import Guesser
 
 def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0, redis_db=5):
     """
-    Returns two accuracies:
+    Returns two accuracies and classifier:
     NLTK accuracy is the internal accuracy of the classifier 
     Manual Accuracy is the accuracy when compared to pre-flagged/known samples and label.
    
     Keyword Arguments:
-    db_name         -- Samples database to use, by default this is the same as your trained database
-                       with an offset to ensure unseen data. Should be a string database name located in ~/.synt.
-    test_samples    -- Amount of samples to use, by default this will be 25% of the training set amount.
-    neutral_range   -- Will be used to drop "neutrals" to see how real-world accuracy will look.
-                       For example in the case where neutral range is 0.2 if the sentiment 
-                       guessed is not greater than 0.2 or less than -0.2 it is not considered.
-                       Leaving this set to 0 will not cause the special case drops and will by default
-                       categorize text as either positive or negative. This may be undesired as the classifier
-                       will treat 0.0001 as positive even though it is not a strong indication.
-    offset          -- By default the offset is decided from the end of the the trained amount, i.e 
-                       if you've trained on 1000 and you have 250 testing samples the samples retrieved
-                       will be from 1000-1250, you can override this offset if you wish to use a different
-                       subset.
-    redis_db        -- The redis database to use.
+    db_name (str) -- Samples database to use, by default this is the same as your trained database 
+                     with an offset to ensure unseen data. Should be a string database name located in ~/.synt. 
+    
+    test_samples (int) -- Amount of samples to use, by default this will be 25% of the training set amount. 
+    
+    neutral_range (float) -- Will be used to drop "neutrals" to see how real-world accuracy will look. 
+                             For example in the case where neutral range is 0.2 if the sentiment 
+                             guessed is not greater than 0.2 or less than -0.2 it is not considered.
+                             Leaving this set to 0 will not cause the special case drops and will by default
+                             categorize text as either positive or negative. This may be undesired as the classifier
+                             will treat 0.0001 as positive even though it is not a strong indication.
+    
+    offset (int) -- By default the offset is decided from the end of the the trained amount, i.e 
+                    if you've trained on 1000 and you have 250 testing samples the samples retrieved
+                    will be from 1000-1250, you can override this offset if you wish to use a different
+                    subset. 
+    
+    redis_db (int) -- The redis database to use. 
     """
     
     m = RedisManager(db=redis_db)

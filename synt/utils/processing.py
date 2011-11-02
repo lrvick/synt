@@ -3,20 +3,20 @@
 
 import multiprocessing
 
-def batch_job(producer, consumer, chunksize=10000, processes=None, **consumer_args):
+def batch_job(producer, consumer, chunksize=10000, processes=None, consumer_args={}):
     """
     Call consumer on everything that is produced from producer, using a pool.
 
-    Args:
-    producer    -- Produces the events that are fed to the consumer.
-    consumer    -- Function called with values recieved from the producer.
+    Arguments:
+    producer (func/list) -- Produces the events that are fed to the consumer.
+    consumer (func) -- Function called with values recieved from the producer.
 
     Keyword Arguments:
-    chunksize     -- How many values to request from the producer.
-    processes     -- How many processes should be created to handle jobs.
-    consumer_args -- Arguments to pass along to the consumer.
+    chunksize (int) -- How many values to request from the producer.
+    processes (int) -- How many processes should be created to handle jobs.
+    consumer_args (dict) -- Arguments to pass along to the consumer.
+    
     """
-
     p = producer
 
     if type(producer) in [list,tuple]:

@@ -12,12 +12,19 @@ class Guesser(object):
         self.normalizer = normalize_text
    
     def _get_classifier(self):
+        """
+        Gets the classifier when it is first required.
+        """
         print("Retrieving classifier ...")
         self._classifier = RedisManager(db=self.redis_db).pickle_load(self.classifier_type) 
 
     def guess(self, text):
         """
-        Takes text and returns the sentiment score between -1 and 1.
+        Returns the sentiment score between -1 and 1.
+        
+        Arguments:
+        text (str) -- Text to classify.
+        
         """
         
         try:
