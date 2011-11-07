@@ -2,6 +2,14 @@
 """Tools for extracting features and text processing."""
 
 from nltk.corpus import stopwords
+
+try:
+    stopwords.words
+except LookupError:
+    import nltk
+    print("Downloading needed nltk data...")
+    nltk.download('all')
+
 from synt.utils.db import RedisManager
 
 def get_extractor(type):
