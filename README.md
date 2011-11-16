@@ -23,7 +23,7 @@
 
 ## Requirements ##
 
-  * A running [Redis](http://redis.com) server
+  * A running [Redis](http://redis.io) server
   * [pip](http://www.pip-installer.org/en/latest/index.html)
   * [virtualenv](http://www.virtualenv.org/en/latest/index.html) (recommended)
   * [python2.7](http://www.python.org/getit/releases/2.7/) (no support for
