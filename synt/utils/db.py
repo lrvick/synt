@@ -14,28 +14,28 @@ from synt import config
 def db_exists(name):
     """
     Returns true if the database exists in our path defined by DB_PATH.
-    
+
     Arguments:
     name (str) -- Database name.
 
     """
     path = os.path.join(os.path.expanduser(config.DB_PATH), name)
     return True if os.path.exists(path) else False
-    
+
 def db_init(db='samples.db', create=True):
     """
     Initializes the sqlite3 database.
-    
+
     Keyword Arguments:
     db (str) -- Name of the database to use.
     create (bool) -- If creating the database for the first time.
-    
+
     """
     if not os.path.exists(os.path.expanduser(config.DB_PATH)):
         os.makedirs(os.path.expanduser(config.DB_PATH))
 
     fp = os.path.join(os.path.expanduser(config.DB_PATH), db)
-    
+
     if not db_exists(db):
         conn = sqlite3.connect(fp)
         cursor = conn.cursor()
@@ -50,7 +50,7 @@ def redis_feature_consumer(samples, **kwargs):
     """
     Stores feature and counts to redis via a pipeline.
     """
-    
+
     if 'db' not in kwargs:
         raise KeyError("Feature consumer requires db.")
 
@@ -62,7 +62,7 @@ def redis_feature_consumer(samples, **kwargs):
     neg_processed, pos_processed = 0, 0
 
     for text, label in samples:
-        
+
         count_label = label + '_wordcounts'
 
         tokens = normalize_text(text)
@@ -76,15 +76,16 @@ def redis_feature_consumer(samples, **kwargs):
             for word in set(tokens): #make sure we only add word once
                 pipeline.zincrby(count_label, word)
 
-    pipeline.incr('negative_processed', neg_processed) 
+    pipeline.incr('negative_processed', neg_processed)
     pipeline.incr('positive_processed', pos_processed)
-    
+
     pipeline.execute()
 
 class RedisManager(object):
 
-    def __init__(self, db=5, host='localhost', purge=False):
-        self.r = redis.Redis(db=db, host=host)
+    def __init__(self, db=5, host=config.REDIS_HOST,
+            password=config.REDIS_PASSWORD, purge=False):
+        self.r = redis.Redis(db=db, host=host, password=password)
         self.db = db
         if purge is True:
             self.r.flushdb()
@@ -92,14 +93,14 @@ class RedisManager(object):
     def store_feature_counts(self, samples, chunksize=10000, processes=None):
         """
         Stores feature:count histograms for samples in Redis with the ability to increment.
-       
+
         Arguments:
         samples (list) -- List of samples in the format (text, label)
 
         Keyword Arguments:
         chunksize (int) -- Amount of samples to process at a time.
-        processes (int) -- Amount of processors to use with multiprocessing.  
-        
+        processes (int) -- Amount of processors to use with multiprocessing.
+
         """
 
         if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
@@ -134,12 +135,12 @@ class RedisManager(object):
 
         self.pickle_store('word_fd', word_fd)
         self.pickle_store('label_fd', label_word_freqdist)
-    
+
     def store_feature_scores(self):
         """
         Determine the scores of words based on chi-sq and stores word:score to Redis.
         """
-        
+
         try:
             word_fd = self.pickle_load('word_fd')
             label_word_freqdist = self.pickle_load('label_fd')
@@ -158,9 +159,9 @@ class RedisManager(object):
 
                 pos_score = BigramAssocMeasures.chi_sq(label_word_freqdist['positive'][word], (freq, pos_word_count), total_word_count)
                 neg_score = BigramAssocMeasures.chi_sq(label_word_freqdist['negative'][word], (freq, neg_word_count), total_word_count)
-            
-                word_scores[word] = pos_score + neg_score 
-      
+
+                word_scores[word] = pos_score + neg_score
+
         self.pickle_store('word_scores', word_scores)
 
     def store_best_features(self, n=10000):
@@ -169,18 +170,18 @@ class RedisManager(object):
 
         Keyword Arguments:
         n (int) -- Amount of features to store as best features.
-        
+
         """
         if not n: return
 
         word_scores = self.pickle_load('word_scores')
 
         assert word_scores, "Word scores need to exist."
-        
+
         best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
 
         self.pickle_store('best_words',  best)
-        
+
     def get_best_features(self):
         """
         Return stored best features.
@@ -204,10 +205,10 @@ def get_sample_limit(db='samples.db'):
     """
     Returns the limit of samples so that both positive and negative samples
     will remain balanced.
-    
+
     Keyword Arguments:
     db (str) -- Name of the database to use.
-    
+
     """
 
     #this is an expensive operation in case of a large database
@@ -226,22 +227,22 @@ def get_sample_limit(db='samples.db'):
         limit = pos_count
     else:
         limit = neg_count
-    
+
     m.r.set('limit', limit)
-    
+
     return limit
 
 def get_samples(db, limit, offset=0):
     """
     Returns a combined list of negative and positive samples in a (text, label) format.
-    
+
     Arguments:
     db (str) -- Name of the databse to use.
     limit (int) -- Amount of samples to retrieve.
 
     Keyword Arguments:
     offset (int) -- Where to start getting samples from.
-    
+
     """
 
     db = db_init(db=db)
@@ -256,8 +257,8 @@ def get_samples(db, limit, offset=0):
 
     if limit % 2 != 0:
         limit -= 1 #we want an even number
-    
-    limit = limit / 2 
+
+    limit = limit / 2
     offset = offset / 2
 
     cursor.execute(sql, ["negative", limit, offset])

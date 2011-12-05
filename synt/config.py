@@ -20,7 +20,8 @@ EMOTICONS = [
 CLASSIFIERS = {
     'naivebayes'   : nltk.NaiveBayesClassifier,
     #'maxent'      : nltk.MaximumEntClassifier,
-    #'decisiontree': nltk.DecisionTreeClassifier, 
+    #'decisiontree': nltk.DecisionTreeClassifier,
 }
 
-
+REDIS_HOST = 'localhost'
+REDIS_PASSWORD = None
