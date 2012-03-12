@@ -9,7 +9,7 @@ from synt.utils.db import db_init
 from synt import config
 from kral import stream
 
-def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
+def collect(db_name='', commit_every=1000, max_collect=400000, query_file=''):
     """
     Will continuously populate the sample database if it exists
     else it will create a new one.
@@ -18,13 +18,7 @@ def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
     db_name (str) -- Custom name for database.
     commit_every (int) -- Commit to sqlite after commit_every executes.
     max_collect (int) -- Will stop collecting at this number.
-    queries_file (str) -- If queries file is provided should be a path to a text file
-                          containing the queries in the format:
-
-                          label
-                          query1
-                          queryN
-
+    query_file (str) -- If query file is provided should be absolute path to text file.
     """
 
     if not db_name:
@@ -37,15 +31,15 @@ def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
 
     queries = {}
 
-    if queries_file:
-        try:
-            f = open(queries_file)
-            words = [line.strip() for line in f.readlines()]
-            label = words[0]
-            for w in words:
-                queries[w] = label
-        except IOError:
-            pass
+    if query_file:
+        if not os.path.exists(query_file):
+            return "Query file path does not exist."
+        
+        f = open(query_file)
+        words = [line.strip() for line in f.readlines()]
+        label = words[0]
+        for w in words:
+            queries[w] = label
 
     else:
         queries[':)'] =  'positive'
