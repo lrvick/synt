@@ -3,7 +3,9 @@ from synt.trainer import train
 from synt.collector import collect, fetch
 from synt.guesser import Guesser 
 from synt.accuracy import test_accuracy
+from synt import config
 import sys, time
+import datetime
 
 try:
     import argparse
@@ -63,19 +65,22 @@ def main():
     )
     train_parser.add_argument(
         '--redis_db',
-        default=5, 
+        default=config.REDIS_DB, 
         type=int,
         help="The redis db to use. By default 5",
     )
 
     #Collect parser
+    d = datetime.datetime.now()
+    db_name = "samples-%s-%s-%s.db" % (d.year, d.month, d.day)
+
     collect_parser = subparsers.add_parser(
         'collect',
         help='Collect samples.'
     )
     collect_parser.add_argument(
         '--db_name',
-        default=None,
+        default=db_name,
         help="Optional database name to store as.",
     )
     collect_parser.add_argument(
@@ -89,6 +94,12 @@ def main():
         default=2000000,
         type=int,
         help="The amount to stop collecting at. Default is 2 million",
+    )
+    collect_parser.add_argument(
+        '--query_file',
+        default='',
+        type=str,
+        help="Absolute path to query file to use.",
     )
 
     #Fetch parser
@@ -120,7 +131,7 @@ def main():
     )
     guess_parser.add_argument(
         '--redis_db',
-        default=5, 
+        default=config.REDIS_DB, 
         help="The redis database to use.",
     )
 
@@ -157,7 +168,7 @@ def main():
     )
     accuracy_parser.add_argument(
         '--redis_db',
-        default=5,
+        default=config.REDIS_DB,
         type=int,
         help="You can override the redis database used, by default its the same as the training db.",
     )
@@ -190,11 +201,12 @@ def main():
         print("Beginning collecting {} samples to {}.".format(args.max_collect, args.db_name))
         
         start = time.time() 
-        
+
         collect(
             db_name      = args.db_name,
             commit_every = args.commit_every,
             max_collect  = args.max_collect,
+            query_file   = args.query_file,
         )    
         
         print("Finished collecting samples in {} seconds.".format(time.time() - start))
