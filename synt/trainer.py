@@ -6,7 +6,7 @@ from synt.utils.extractors import get_extractor
 from synt import config
 
 def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type='words',
-    best_features=10000, processes=8, purge=False, redis_db=5):
+    best_features=10000, processes=8, purge=False, redis_db=config.REDIS_DB) :
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
 
@@ -19,7 +19,7 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     extractor_type (str) -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'.
     best_features (int) -- Amount of highly informative features to store.
     processes (int) -- The amount of processes to be used for counting features in parallel.
-    redis_db (int) -- Redis database to use for Redis Manager.
+    redis_db (int) -- The redis database to use.
     """
     m = RedisManager(db=redis_db, purge=purge)
 
@@ -40,7 +40,6 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     train_samples = get_samples(db_name, samples)
 
     m.store_feature_counts(train_samples, processes=processes)
-    m.store_freqdists()
     m.store_feature_scores()
 
     if best_features and best_features > 1:
@@ -54,19 +53,18 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     label_freqdist.inc('negative', int(neg_processed))
     label_freqdist.inc('positive', int(pos_processed))
 
-    conditional_fd = m.pickle_load('label_fd')
-
-    labels = conditional_fd.conditions()
+    labeled_feature_freqs = m.pickle_load('labeled_feature_freqs')
+    labels = labeled_feature_freqs.keys() 
 
     #feature extraction
     feat_ex = extractor()
-    extracted_set = set([feat_ex.extract(conditional_fd[label].keys(), as_list=True) for label in labels][0])
+    extracted_set = set([feat_ex.extract(labeled_feature_freqs[label].keys(), as_list=True) for label in labels][0])
 
     #increment the amount of times a given feature for label occured and fill in the missing occurences with Falses
     for label in labels:
         samples = label_freqdist[label]
         for fname in extracted_set:
-            trues = conditional_fd[label][fname]
+            trues = labeled_feature_freqs[label].get(fname, 0)
             falses = samples - trues
             feature_freqdist[label, fname].inc(True, trues)
             feature_freqdist[label, fname].inc(False, falses)
@@ -100,7 +98,6 @@ if __name__ == "__main__":
     processes     = 8
     purge         = True
     extractor     = 'words'
-    redis_db      = 5
 
     print("Beginning train on {} samples using '{}' db..".format(samples, db_name))
     start = time.time()
@@ -111,6 +108,5 @@ if __name__ == "__main__":
             extractor_type= extractor,
             processes     = processes,
             purge         = purge,
-            redis_db      = redis_db,
-            )
+    )
     print("Successfully trained in {} seconds.".format(time.time() - start))
