@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """Config for synt project."""
-
 import os
 import nltk
 
 PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
 
-DB_PATH = "~/.synt/"
+DB_PATH = os.path.expanduser("~/.synt/")
 
 EMOTICONS = [
     ':-L', ':L', '<3', '8)', '8-)', '8-}', '8]', '8-]', '8-|', '8(', '8-(',
@@ -23,5 +22,7 @@ CLASSIFIERS = {
     #'decisiontree': nltk.DecisionTreeClassifier,
 }
 
+REDIS_DB = 5
+REDIS_TEST_DB = 10 #Used for running test cases.
 REDIS_HOST = 'localhost'
 REDIS_PASSWORD = None
