@@ -6,8 +6,7 @@ from synt import config
 
 class Guesser(object):
 
-    def __init__(self, classifier_type='naivebayes',
-        extractor_type='stopwords', redis_db=5):
+    def __init__(self, classifier_type='naivebayes', extractor_type='stopwords', redis_db=config.REDIS_DB):
         self.classifier_type = classifier_type
         self.manager = RedisManager(db=redis_db)
         self.extractor = get_extractor(extractor_type)()

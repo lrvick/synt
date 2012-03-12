@@ -6,8 +6,7 @@ from synt.utils.extractors import get_extractor
 from synt.guesser import Guesser
 from synt import config
 
-def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0,
-        redis_db=5):
+def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0, redis_db=config.REDIS_DB):
     """
     Returns two accuracies and classifier:
     NLTK accuracy is the internal accuracy of the classifier
@@ -31,7 +30,6 @@ def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0,
                     if you've trained on 1000 and you have 250 testing samples the samples retrieved
                     will be from 1000-1250, you can override this offset if you wish to use a different
                     subset.
-
     redis_db (int) -- The redis database to use.
     """
 
@@ -108,12 +106,11 @@ if __name__ == "__main__":
     import time
 
     neutral_range = 0.2
-    redis_db      = 4
 
     print("Testing accuracy with neutral range: {}.".format(neutral_range))
     start = time.time()
 
-    n_accur, m_accur, c = test_accuracy(neutral_range=neutral_range, redis_db=redis_db)
+    n_accur, m_accur, c = test_accuracy(neutral_range=neutral_range)
 
     c.show_most_informative_features(30)
 
