@@ -5,7 +5,7 @@ import os
 import sqlite3
 import redis
 import cPickle as pickle
-from nltk.probability import ConditionalFreqDist, FreqDist
+#from nltk.probability import ConditionalFreqDist, FreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import normalize_text
 from synt.utils.processing import batch_job
@@ -19,10 +19,10 @@ def db_exists(name):
     name (str) -- Database name.
 
     """
-    path = os.path.join(os.path.expanduser(config.DB_PATH), name)
+    path = os.path.join(config.DB_PATH, name)
     return True if os.path.exists(path) else False
 
-def db_init(db='samples.db', create=True):
+def db_init(db, create=True):
     """
     Initializes the sqlite3 database.
 
@@ -31,10 +31,11 @@ def db_init(db='samples.db', create=True):
     create (bool) -- If creating the database for the first time.
 
     """
-    if not os.path.exists(os.path.expanduser(config.DB_PATH)):
-        os.makedirs(os.path.expanduser(config.DB_PATH))
+    
+    if not os.path.exists(config.DB_PATH):
+        os.makedirs(config.DB_PATH)
 
-    fp = os.path.join(os.path.expanduser(config.DB_PATH), db)
+    fp = os.path.join(config.DB_PATH, db)
 
     if not db_exists(db):
         conn = sqlite3.connect(fp)
@@ -63,7 +64,7 @@ def redis_feature_consumer(samples, **kwargs):
 
     for text, label in samples:
 
-        count_label = label + '_wordcounts'
+        count_label = label + '_feature_counts'
 
         tokens = normalize_text(text)
 
@@ -83,8 +84,7 @@ def redis_feature_consumer(samples, **kwargs):
 
 class RedisManager(object):
 
-    def __init__(self, db=5, host=config.REDIS_HOST,
-            password=config.REDIS_PASSWORD, purge=False):
+    def __init__(self, db=config.REDIS_DB, host=config.REDIS_HOST, password=config.REDIS_PASSWORD, purge=False):
         self.r = redis.Redis(db=db, host=host, password=password)
         self.db = db
         if purge is True:
@@ -103,66 +103,60 @@ class RedisManager(object):
 
         """
 
-        if 'positive_wordcounts' and 'negative_wordcounts' in self.r.keys():
+        if 'positive_feature_counts' and 'negative_feature_counts' in self.r.keys():
             return
 
         #do this with multiprocessing
         c_args = {'db': self.db}
         batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, consumer_args=c_args)
 
-    def store_freqdists(self):
-        """
-        Build NLTK frequency distributions based on feature counts and store them to Redis.
-        """
-        #TODO: this step and the above may possibly be combined
-
-        word_fd = FreqDist()
-        label_word_freqdist = ConditionalFreqDist()
-
-        pos_words = self.r.zrange('positive_wordcounts', 0, -1, withscores=True, desc=True)
-        neg_words = self.r.zrange('negative_wordcounts', 0, -1, withscores=True, desc=True)
-
-        assert pos_words and neg_words, 'Requires wordcounts to be stored in redis.'
-
-        #build a condtional freqdist with the feature counts per label
-        for word, count in pos_words:
-            word_fd.inc(word, count)
-            label_word_freqdist['positive'].inc(word, count)
-
-        for word,count in neg_words:
-            word_fd.inc(word, count)
-            label_word_freqdist['negative'].inc(word, count)
-
-        self.pickle_store('word_fd', word_fd)
-        self.pickle_store('label_fd', label_word_freqdist)
-
     def store_feature_scores(self):
         """
-        Determine the scores of words based on chi-sq and stores word:score to Redis.
+        Build scores based on chi-sq and store from stored features then save their scores to Redis.
         """
+        
+        pos_words = self.r.zrange('positive_feature_counts', 0, -1, withscores=True, desc=True)
+        neg_words = self.r.zrange('negative_feature_counts', 0, -1, withscores=True, desc=True)
 
-        try:
-            word_fd = self.pickle_load('word_fd')
-            label_word_freqdist = self.pickle_load('label_fd')
-        except TypeError:
-            print('Requires frequency distributions to be built.')
+        assert pos_words and neg_words, 'Requires feature counts to be stored in redis.'
 
-        word_scores = {}
+        feature_freqs = {}
+        labeled_feature_freqs = {'positive': {}, 'negative': {}}
+        labels = labeled_feature_freqs.keys() 
 
-        pos_word_count = label_word_freqdist['positive'].N()
-        neg_word_count = label_word_freqdist['negative'].N()
-        total_word_count = pos_word_count + neg_word_count
+        #build a condtional freqdist with the feature counts per label
+        for feature,freq in pos_words:
+            feature_freqs[feature] = freq
+            labeled_feature_freqs['positive'].update({feature : freq})
 
-        for label in label_word_freqdist.conditions():
+        for feature,freq in neg_words:
+            feature_freqs[feature] = freq 
+            labeled_feature_freqs['negative'].update({feature : freq})
 
-            for word, freq in word_fd.iteritems():
+        scores = {}
 
-                pos_score = BigramAssocMeasures.chi_sq(label_word_freqdist['positive'][word], (freq, pos_word_count), total_word_count)
-                neg_score = BigramAssocMeasures.chi_sq(label_word_freqdist['negative'][word], (freq, neg_word_count), total_word_count)
+        pos_feature_count = len(labeled_feature_freqs['positive'])
+        neg_feature_count = len(labeled_feature_freqs['negative'])
+        total_feature_count = pos_feature_count + neg_feature_count
 
-                word_scores[word] = pos_score + neg_score
+        for label in labels:
+            for feature,freq in feature_freqs.items():
+                pos_score = BigramAssocMeasures.chi_sq(
+                        labeled_feature_freqs['positive'].get(feature, 0),
+                        (freq, pos_feature_count),
+                        total_feature_count
+                )
+                neg_score = BigramAssocMeasures.chi_sq(
+                        labeled_feature_freqs['negative'].get(feature, 0),
+                        (freq, neg_feature_count),
+                        total_feature_count
+                )
 
-        self.pickle_store('word_scores', word_scores)
+                scores[feature] = pos_score + neg_score
+
+        self.pickle_store('feature_freqs', feature_freqs)
+        self.pickle_store('labeled_feature_freqs', labeled_feature_freqs)
+        self.pickle_store('scores', scores)
 
     def store_best_features(self, n=10000):
         """
@@ -174,34 +168,31 @@ class RedisManager(object):
         """
         if not n: return
 
-        word_scores = self.pickle_load('word_scores')
+        feature_scores = self.pickle_load('scores')
 
-        assert word_scores, "Word scores need to exist."
+        assert feature_scores, "Feature scores need to exist."
 
-        best = sorted(word_scores.iteritems(), key=lambda (w,s): s, reverse=True)[:n]
+        best = sorted(feature_scores.items(), key=lambda (w,s): s, reverse=True)[:n]
 
-        self.pickle_store('best_words',  best)
+        self.pickle_store('best_features',  best)
 
     def get_best_features(self):
         """
         Return stored best features.
         """
-        best_words = self.pickle_load('best_words')
+        best_features = self.pickle_load('best_features')
 
-        if best_words:
-            return set([word for word,score in best_words])
+        if best_features:
+            return set([feature for feature,score in best_features])
 
     def pickle_store(self, name, data):
         dump = pickle.dumps(data, protocol=1) #highest_protocol breaks with NLTKs FreqDist
         self.r.set(name, dump)
 
     def pickle_load(self, name):
-        try:
-            return pickle.loads(self.r.get(name))
-        except TypeError:
-            return
+        return pickle.loads(self.r.get(name))
 
-def get_sample_limit(db='samples.db'):
+def get_sample_limit(db):
     """
     Returns the limit of samples so that both positive and negative samples
     will remain balanced.
@@ -244,16 +235,15 @@ def get_samples(db, limit, offset=0):
     offset (int) -- Where to start getting samples from.
 
     """
-
-    db = db_init(db=db)
-    cursor = db.cursor()
+    conn = db_init(db=db)
+    cursor = conn.cursor()
 
     sql =  "SELECT text, sentiment FROM item WHERE sentiment = ? LIMIT ? OFFSET ?"
 
     if limit < 2: limit = 2
 
-    if limit > get_sample_limit():
-        limit = get_sample_limit()
+    if limit > get_sample_limit(db):
+        limit = get_sample_limit(db)
 
     if limit % 2 != 0:
         limit -= 1 #we want an even number
