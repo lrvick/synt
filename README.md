@@ -36,8 +36,8 @@
 
 ## Usage / Installation ##
 
-**Note:** Many of these commands have additional arguments you can pass, use
-the -h flag to get help on any particular command and see more options.
+**Note: Many of these commands have additional arguments you can pass, use
+the -h flag to get help on any particular command and see more options.**
 
   1. Grab the latest synt:
 
@@ -47,6 +47,10 @@ the -h flag to get help on any particular command and see more options.
 
   2. Grab the sample database to train on (or build one (below)):
 
+    **Note: On your first run of any cli command a config will be copied into
+    ~/.synt/config.py that you should configure. It uses sane defaults. This
+    will only happen on the first run of synt.**
+    
     ```bash
     synt fetch --db_name "mysamples.db"
     ```
