@@ -3,8 +3,9 @@
 import os
 import nltk
 
-#Where collected databases are stored by default
-DB_PATH = os.path.expanduser("~/.synt")
+#Where collected databases and user config are stored by default
+SYNT_PATH = os.path.expanduser("~/.synt")
+USER_CONFIG_PATH = os.path.join(SYNT_PATH, 'config.py') 
 
 #Emoticons may serve as useful indicatiors in classifying sentiment. 
 #These are the set of default emoticons to use, you may use your own or 
@@ -33,3 +34,7 @@ REDIS_TEST_DB = 10
 REDIS_HOST = 'localhost'
 
 REDIS_PASSWORD = None
+
+#If the user config is in place, use settings from there instead.
+if os.path.exists(USER_CONFIG_PATH):
+    execfile(USER_CONFIG_PATH)

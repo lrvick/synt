@@ -106,7 +106,7 @@ def fetch(db_name='samples.db'):
 
     decompressor = bz2.BZ2Decompressor()
 
-    fp = os.path.join(os.path.expanduser(config.DB_PATH), db_name)
+    fp = os.path.join(os.path.expanduser(config.SYNT_PATH), db_name)
 
     if os.path.exists(fp):
         os.remove(fp)

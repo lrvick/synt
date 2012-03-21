@@ -2,13 +2,12 @@
 from synt.utils.db import RedisManager
 from synt.utils.extractors import get_extractor
 from synt.utils.text import normalize_text
-from synt import config
 
 class Guesser(object):
 
-    def __init__(self, classifier_type='naivebayes', extractor_type='stopwords', redis_db=config.REDIS_DB):
+    def __init__(self, classifier_type='naivebayes', extractor_type='stopwords'): 
         self.classifier_type = classifier_type
-        self.manager = RedisManager(db=redis_db)
+        self.manager = RedisManager()
         self.extractor = get_extractor(extractor_type)()
         self.normalizer = normalize_text
 

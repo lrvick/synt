@@ -6,6 +6,8 @@ from synt.accuracy import test_accuracy
 from synt import config
 import sys, time
 import datetime
+import shutil
+import os
 
 try:
     import argparse
@@ -14,10 +16,24 @@ except ImportError:
 
 VERSION = '0.1.0'
 
+PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
+
 def main():
 
-    parser = argparse.ArgumentParser(description='Tool to interface with synt, provides a way to train, collect and guess from the command line.')
+    if not os.path.exists(config.SYNT_PATH):
+        os.makedirs(config.SYNT_PATH)
+        
+        #copy user config for first time run
+        if not os.path.exists(config.USER_CONFIG_PATH):
+            user_config = os.path.join(PROJECT_PATH, 'user_config.py')
+            target_config = config.USER_CONFIG_PATH
+            shutil.copy(user_config, target_config)
 
+            print("First time run created a config in ~/.synt that Synt will use. Please make sure everything is ok then re-run your previous commands.")
+            return
+
+
+    parser = argparse.ArgumentParser(description='Tool to interface with synt, provides a way to train, collect and guess from the command line.')
     subparsers = parser.add_subparsers(dest='parser')
 
     #Train Parser
@@ -62,12 +78,6 @@ def main():
         '--processes',
         default=4,
         help="Will utilize multiprocessing if available with this number of processes. By default 4."
-    )
-    train_parser.add_argument(
-        '--redis_db',
-        default=config.REDIS_DB, 
-        type=int,
-        help="The redis db to use. By default 5",
     )
 
     #Collect parser
@@ -129,11 +139,6 @@ def main():
         default='',
         help="Given text, will guess the sentiment on it.",
     )
-    guess_parser.add_argument(
-        '--redis_db',
-        default=config.REDIS_DB, 
-        help="The redis database to use.",
-    )
 
     #Accuracy parser
     accuracy_parser = subparsers.add_parser(
@@ -166,12 +171,6 @@ def main():
         are testing on 25 it will start from 100-125 to ensure the testing samples are new. You can override what offset to use 
         with this argument.""",
     )
-    accuracy_parser.add_argument(
-        '--redis_db',
-        default=config.REDIS_DB,
-        type=int,
-        help="You can override the redis database used, by default its the same as the training db.",
-    )
 
     args = parser.parse_args()
 
@@ -192,7 +191,6 @@ def main():
             best_features   = args.best_features,
             processes       = args.processes,
             purge           = purge,
-            redis_db        = args.redis_db, 
         )
         
         print("Finished training in {}.".format(time.time() - start))
@@ -217,7 +215,7 @@ def main():
         print("Finished fetch.")
 
     elif args.parser == 'guess':
-        g = Guesser(redis_db=args.redis_db)
+        g = Guesser()
         
         if args.text:
             print("Guessed: ",  g.guess(args.text))
@@ -242,7 +240,6 @@ def main():
             test_samples  = args.test_samples,
             neutral_range = args.neutral_range,
             offset        = args.offset,
-            redis_db      = args.redis_db,
         )
         
         print("NLTK Accuracy: {}".format(n_accur))

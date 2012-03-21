@@ -5,8 +5,8 @@ from collections import defaultdict
 from synt.utils.extractors import get_extractor
 from synt import config
 
-def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type='words',
-    best_features=10000, processes=8, purge=False, redis_db=config.REDIS_DB) :
+def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type='words', 
+    best_features=10000, processes=8, purge=False):
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
 
@@ -19,9 +19,9 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     extractor_type (str) -- Type of extractor to use. Available extractors are 'words', 'stopwords', 'bestwords'.
     best_features (int) -- Amount of highly informative features to store.
     processes (int) -- The amount of processes to be used for counting features in parallel.
-    redis_db (int) -- The redis database to use.
+    purge (bool) -- If true will flush the redis database.
     """
-    m = RedisManager(db=redis_db, purge=purge)
+    m = RedisManager(purge=purge)
 
     extractor = get_extractor(extractor_type)
 

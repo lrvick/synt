@@ -4,9 +4,8 @@ from synt.utils.db import get_samples, RedisManager
 from synt.utils.text import normalize_text
 from synt.utils.extractors import get_extractor
 from synt.guesser import Guesser
-from synt import config
 
-def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0, redis_db=config.REDIS_DB):
+def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0):
     """
     Returns two accuracies and classifier:
     NLTK accuracy is the internal accuracy of the classifier
@@ -30,10 +29,9 @@ def test_accuracy(db_name='', test_samples=0, neutral_range=0, offset=0, redis_d
                     if you've trained on 1000 and you have 250 testing samples the samples retrieved
                     will be from 1000-1250, you can override this offset if you wish to use a different
                     subset.
-    redis_db (int) -- The redis database to use.
     """
 
-    m = RedisManager(db=redis_db)
+    m = RedisManager()
     trained_classifier = m.r.get('trained_classifier') #retrieve the trained classifier
 
     if not trained_classifier:

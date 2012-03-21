@@ -13,13 +13,13 @@ from synt import config
 
 def db_exists(name):
     """
-    Returns true if the database exists in our path defined by DB_PATH.
+    Returns true if the database exists in our path defined by SYNT_PATH.
 
     Arguments:
     name (str) -- Database name.
 
     """
-    path = os.path.join(config.DB_PATH, name)
+    path = os.path.join(config.SYNT_PATH, name)
     return True if os.path.exists(path) else False
 
 def db_init(db, create=True):
@@ -32,10 +32,10 @@ def db_init(db, create=True):
 
     """
     
-    if not os.path.exists(config.DB_PATH):
-        os.makedirs(config.DB_PATH)
+    if not os.path.exists(config.SYNT_PATH):
+        os.makedirs(config.SYNT_PATH)
 
-    fp = os.path.join(config.DB_PATH, db)
+    fp = os.path.join(config.SYNT_PATH, db)
 
     if not db_exists(db):
         conn = sqlite3.connect(fp)
