@@ -16,7 +16,6 @@ class Guesser(object):
         """
         Gets the classifier when it is first required.
         """
-        print("Retrieving classifier ...")
         self._classifier = self.manager.pickle_load(self.classifier_type)
 
     def guess(self, text):
@@ -33,9 +32,7 @@ class Guesser(object):
         except AttributeError:
             self._get_classifier()
             classifier = self._classifier
-            if not classifier:
-                print("guess needs a classifier, make sure you're using a supported classifier and you've trained.")
-                return
+            assert classifier, "guess needs a classifier"
 
         tokens = self.normalizer(text)
 
