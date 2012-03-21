@@ -14,12 +14,13 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         'redis',
-        'nltk==2.0.1rc1',
-        'PyYAML==3.09',
+        'PyYAML',
         'simplejson',
         'kral',
+        'nltk',
     ],
     dependency_links = [
         'http://github.com/Tawlk/kral/tarball/master#egg=kral',
+        'http://github.com/nltk/nltk/tarball/master#egg=nltk',
     ]
 )
