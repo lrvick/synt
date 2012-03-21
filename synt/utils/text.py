@@ -48,10 +48,13 @@ def normalize_text(text):
     for pat in format_pats:
         text = re.sub(pat[0], pat[1], text)
 
+
+    emoticons = getattr(config, 'EMOTICONS', '')
     _tmp = set()
-    for e in config.EMOTICONS:
-        if e in text:
-            _tmp.add(e)
+    if emoticons:
+        for e in emoticons:
+            if e in text:
+                _tmp.add(e)
 
     text = text.translate(PUNC_MAP).strip() + ' ' #remove punctuation
     if _tmp:
