@@ -5,7 +5,6 @@ import os
 import sqlite3
 import redis
 import cPickle as pickle
-#from nltk.probability import ConditionalFreqDist, FreqDist
 from nltk.metrics import BigramAssocMeasures
 from synt.utils.text import normalize_text
 from synt.utils.processing import batch_job
@@ -83,10 +82,11 @@ def redis_feature_consumer(samples, **kwargs):
     pipeline.execute()
 
 class RedisManager(object):
-
-    def __init__(self, db=config.REDIS_DB, host=config.REDIS_HOST, password=config.REDIS_PASSWORD, purge=False):
-        self.r = redis.Redis(db=db, host=host, password=password)
-        self.db = db
+    def __init__(self, purge=False):
+        self.db = config.REDIS_DB
+        self.host = config.REDIS_HOST
+        self.password = config.REDIS_PASSWORD
+        self.r = redis.Redis(db=self.db, host=self.host, password=self.password)
         if purge is True:
             self.r.flushdb()
 
