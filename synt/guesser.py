@@ -7,15 +7,16 @@ class Guesser(object):
 
     def __init__(self, classifier_type='naivebayes', extractor_type='stopwords'): 
         self.classifier_type = classifier_type
-        self.manager = RedisManager()
         self.extractor = get_extractor(extractor_type)()
         self.normalizer = normalize_text
 
-    def _get_classifier(self):
+    def load_classifier(self):
         """
         Gets the classifier when it is first required.
         """
-        self._classifier = self.manager.pickle_load(self.classifier_type)
+        if not hasattr(self, 'classifier'):
+            manager = RedisManager()
+            self.classifier = manager.pickle_load(self.classifier_type)
 
     def guess(self, text):
         """
@@ -25,14 +26,10 @@ class Guesser(object):
         text (str) -- Text to classify.
 
         """
-
-        try:
-            classifier = self._classifier
-        except AttributeError:
-            self._get_classifier()
-            classifier = self._classifier
-            assert classifier, "guess needs a classifier"
-
+        self.load_classifier()
+        
+        assert self.classifier, "Guess needs a classifier!"
+        
         tokens = self.normalizer(text)
 
         bag_of_words = self.extractor.extract(tokens)
@@ -41,7 +38,7 @@ class Guesser(object):
 
         if bag_of_words:
 
-            prob = classifier.prob_classify(bag_of_words)
+            prob = self.classifier.prob_classify(bag_of_words)
 
             #return a -1 .. 1 score
             score = prob.prob('positive') - prob.prob('negative')
@@ -51,8 +48,6 @@ class Guesser(object):
                 pass
 
         return score
-
-guess = Guesser().guess
 
 if __name__ == '__main__':
     #example usage of guess
