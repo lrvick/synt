@@ -51,12 +51,7 @@ def redis_feature_consumer(samples, **kwargs):
     Stores feature and counts to redis via a pipeline.
     """
 
-    if 'db' not in kwargs:
-        raise KeyError("Feature consumer requires db.")
-
-    db = kwargs['db']
-
-    rm = RedisManager(db=db)
+    rm = RedisManager()
     pipeline = rm.r.pipeline()
 
     neg_processed, pos_processed = 0, 0
@@ -107,8 +102,8 @@ class RedisManager(object):
             return
 
         #do this with multiprocessing
-        c_args = {'db': self.db}
-        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes, consumer_args=c_args)
+        batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes)
+        
 
     def store_feature_scores(self):
         """
