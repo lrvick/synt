@@ -128,4 +128,4 @@ the -h flag to get help on any particular command and see more options.
 
   This code is still in production; use at your own risk. You may be eaten by a grue.
 
-  Questions/Comments? Please check us out on IRC via irc://udderweb.com/#uw
+  Questions/Comments? Please check us out on IRC via irc://irc.freenode.net/#tawlk
