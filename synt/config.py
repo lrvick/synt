@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Config for synt project."""
-
+#Config for the synt project
 import os
 import nltk
 
-PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
+#Where collected databases and user config are stored by default
+SYNT_PATH = os.path.expanduser("~/.synt")
+USER_CONFIG_PATH = os.path.join(SYNT_PATH, 'config.py') 
 
-DB_PATH = "~/.synt/"
-
+#Emoticons may serve as useful indicatiors in classifying sentiment. 
+#These are the set of default emoticons to use, you may use your own or 
+#disregard emoticons entirely they are optional.
 EMOTICONS = [
     ':-L', ':L', '<3', '8)', '8-)', '8-}', '8]', '8-]', '8-|', '8(', '8-(',
     '8-[', '8-{', '-.-', 'xx', '</3', ':-{', ': )', ': (', ';]', ':{', '={',
@@ -17,10 +19,22 @@ EMOTICONS = [
     ':-(', ':, (', ':\'(', ':-]', ':-[', ':]', ':[', '>.>', '<.<'
 ]
 
+
+#Default classifiers supported
 CLASSIFIERS = {
     'naivebayes'   : nltk.NaiveBayesClassifier,
-    #'maxent'      : nltk.MaximumEntClassifier,
-    #'decisiontree': nltk.DecisionTreeClassifier, 
 }
 
+#The database that will house the classifer data.
+REDIS_DB = 5
 
+#The database used for tests.
+REDIS_TEST_DB = 10
+
+REDIS_HOST = 'localhost'
+
+REDIS_PASSWORD = None
+
+#If the user config is in place, use settings from there instead.
+if os.path.exists(USER_CONFIG_PATH):
+    execfile(USER_CONFIG_PATH)

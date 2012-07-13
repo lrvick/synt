@@ -9,24 +9,18 @@ from synt.utils.db import db_init
 from synt import config
 from kral import stream
 
-def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
+def collect(db_name='', commit_every=1000, max_collect=400000, query_file=''):
     """
     Will continuously populate the sample database if it exists
     else it will create a new one.
-    
+
     Keyword Arguments:
     db_name (str) -- Custom name for database.
     commit_every (int) -- Commit to sqlite after commit_every executes.
     max_collect (int) -- Will stop collecting at this number.
-    queries_file (str) -- If queries file is provided should be a path to a text file
-                          containing the queries in the format:
-                          
-                          label 
-                          query1
-                          queryN
-
+    query_file (str) -- If query file is provided should be absolute path to text file.
     """
- 
+
     if not db_name:
         d = datetime.datetime.now()
         #if no dbname is provided we'll store a timestamped db name
@@ -37,42 +31,42 @@ def collect(db_name='', commit_every=1000, max_collect=400000, queries_file=''):
 
     queries = {}
 
-    if queries_file:
-        try:
-            f = open(queries_file)
-            words = [line.strip() for line in f.readlines()]
-            label = words[0]
-            for w in words:
-                queries[w] = label
-        except IOError:
-            pass
+    if query_file:
+        if not os.path.exists(query_file):
+            return "Query file path does not exist."
+        
+        f = open(query_file)
+        words = [line.strip() for line in f.readlines()]
+        label = words[0]
+        for w in words:
+            queries[w] = label
 
     else:
         queries[':)'] =  'positive'
         queries[':('] =  'negative'
 
     #collect on twitter with kral
-    g = stream(query_list=queries.keys(), service_list="twitter") 
+    g = stream(query_list=queries.keys(), service_list="twitter")
 
     c = 0
     for item in g:
-        
+
         text = unicode(item['text'])
-     
+
         sentiment = queries.get(item['query'], None)
 
         if sentiment:
             try:
                 cursor.execute('INSERT INTO item VALUES (NULL,?,?)', [text, sentiment])
                 c += 1
-                if c % commit_every == 0: 
+                if c % commit_every == 0:
                     db.commit()
                     print("Commited {}".format(commit_every))
                 if c == max_collect:
                     break
             except IntegrityError: #skip duplicates
-                continue 
-    
+                continue
+
     db.close()
 
 def import_progress():
@@ -95,12 +89,12 @@ def fetch(db_name='samples.db'):
     """
     Pre-populates training database from public archive of ~2mil tweets.
     Stores training database as db_name in ~/.synt/
-    
+
     Keyword Arguments:
-    db_name (str) -- Custom name for database. 
-    
+    db_name (str) -- Custom name for database.
+
     """
-    
+
     response = urllib2.urlopen('https://github.com/downloads/Tawlk/synt/sample_data.bz2')
 
     total_bytes = int(response.info().getheader('Content-Length').strip())
@@ -112,7 +106,7 @@ def fetch(db_name='samples.db'):
 
     decompressor = bz2.BZ2Decompressor()
 
-    fp = os.path.join(os.path.expanduser(config.DB_PATH), db_name)
+    fp = os.path.join(os.path.expanduser(config.SYNT_PATH), db_name)
 
     if os.path.exists(fp):
         os.remove(fp)
@@ -123,32 +117,32 @@ def fetch(db_name='samples.db'):
     while True:
         seconds = (time.time() - start_time)
         chunk = response.read(8192)
-        
+
         if not chunk:
             break
-        
+
         saved_bytes += len(chunk)
         data_buffer.write(decompressor.decompress(chunk))
-        
+
         if seconds > 1:
             percent = round((float(saved_bytes) / total_bytes)*100, 2)
             speed = round((float(total_bytes / seconds ) / 1024),2)
             speed_type = 'Kb/s'
-            
+
             if speed > 1000:
                 speed = round((float(total_bytes / seconds ) / 1048576),2)
                 speed_type = 'Mb/s'
-            
+
             if last_seconds >= 0.5:
                 last_seconds = 0
                 last_seconds_start = time.time()
                 print("Downloaded %d of %d Mb, %s%s (%0.2f%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type, percent))
             else:
                 last_seconds = (time.time() - last_seconds_start)
-        
+
         if saved_bytes == total_bytes:
             print("Downloaded %d of %d Mb, %s%s (100%%)\r" % (saved_bytes/1048576, total_bytes/1048576, speed, speed_type))
-            
+
             try:
                 db.executescript(data_buffer.getvalue())
             except Exception, e:
