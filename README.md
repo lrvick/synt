@@ -8,17 +8,17 @@
   classification on social text.
 
   The end-goal is to have a simple library that "just works". It should
-  have an easy barrier to entry and be thoroughly documented. 
+  have an easy barrier to entry and be thoroughly documented.
 
 
 ## Current Features ##
 
   * Can collect negative/positive tweets from twitter and store it to a local
     database (can also fetch a pre-existing samples database)
-  * Can train a classifier based on a samples database 
+  * Can train a classifier based on a samples database
   * Can classifiy text and output a score between -1 and 1. (where -1 is
     negative, +1 is positive and anything close to 0 can be considered neutral)
-  * abilitiy to collect, train, guess, and test (accuracy) from cli 
+  * abilitiy to collect, train, guess, and test (accuracy) from cli
 
 
 ## Requirements ##
@@ -50,20 +50,20 @@ the -h flag to get help on any particular command and see more options.**
     **Note: On your first run of any cli command a config will be copied into
     ~/.synt/config.py that you should configure. It uses sane defaults. This
     will only happen on the first run of synt.**
-    
+
     ```bash
     synt fetch --db_name "mysamples.db"
     ```
-    
+
     By default it will be stored as 'samples.db'.
 
     If you'd prefer to build a fresh sample db and have the time, just run collect with
     the desired amount.
 
     ```bash
-    synt collect --max_collect 10000 --db_name 'awesome.db' 
+    synt collect --max_collect 10000 --db_name 'awesome.db'
     ```
-    
+
     **Note:** You can also increment samples in a database by providing the
     same db name.
 
@@ -73,23 +73,23 @@ the -h flag to get help on any particular command and see more options.**
     A basic example of training
 
     ```bash
-    synt train 'samples.db' 20000 
+    synt train 'samples.db' 20000
     ```
-    
+
     Train takes two required arguments: a training database (name), and the amount of
-    samples to train on.  
+    samples to train on.
 
 
   4. Classifier accuracy
 
     At this point you might want to see the classifiers accuracy on the
-    training data. 
+    training data.
 
     ```bash
-    synt accuracy 
+    synt accuracy
     ```
 
-    Accuracy takes a number of testing samples. By default 25% of your training 
+    Accuracy takes a number of testing samples. By default 25% of your training
     sample count will be used as the testing set. You can over-ride this by
     providing the --test_samples argument.
 
@@ -99,14 +99,14 @@ the -h flag to get help on any particular command and see more options.**
 
 
   5. Guessing/classifying text
-    
+
     You should now have a trained classifier and its time to see
     some classification of text.
 
     ```bash
     synt guess
     ```
-    
+
     This will drop you into a synt prompt where you can write text and see
     the score between -1 and 1.
 
@@ -114,7 +114,7 @@ the -h flag to get help on any particular command and see more options.**
     a prompt:
 
     ```bash
-    synt guess --text "i like ponies and rainbows" 
+    synt guess --text "i like ponies and rainbows"
     ```
 
 

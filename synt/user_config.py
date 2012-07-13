@@ -9,5 +9,3 @@ REDIS_TEST_DB = 10
 REDIS_HOST = 'localhost'
 
 REDIS_PASSWORD = None
-
-

@@ -5,7 +5,7 @@ from collections import defaultdict
 from synt.utils.extractors import get_extractor
 from synt import config
 
-def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type='words', 
+def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type='words',
     best_features=10000, processes=8, purge=False):
     """
     Train with samples from sqlite database and stores the resulting classifier in Redis.
@@ -54,7 +54,7 @@ def train(db_name, samples=200000, classifier_type='naivebayes', extractor_type=
     label_freqdist.inc('positive', int(pos_processed))
 
     labeled_feature_freqs = m.pickle_load('labeled_feature_freqs')
-    labels = labeled_feature_freqs.keys() 
+    labels = labeled_feature_freqs.keys()
 
     #feature extraction
     feat_ex = extractor()

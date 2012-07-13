@@ -5,7 +5,7 @@ from synt.utils.text import normalize_text
 
 class Guesser(object):
 
-    def __init__(self, classifier_type='naivebayes', extractor_type='stopwords'): 
+    def __init__(self, classifier_type='naivebayes', extractor_type='stopwords'):
         self.classifier_type = classifier_type
         self.extractor = get_extractor(extractor_type)()
         self.normalizer = normalize_text
@@ -27,9 +27,9 @@ class Guesser(object):
 
         """
         self.load_classifier()
-        
+
         assert self.classifier, "Guess needs a classifier!"
-        
+
         tokens = self.normalizer(text)
 
         bag_of_words = self.extractor.extract(tokens)

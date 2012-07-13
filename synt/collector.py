@@ -34,7 +34,7 @@ def collect(db_name='', commit_every=1000, max_collect=400000, query_file=''):
     if query_file:
         if not os.path.exists(query_file):
             return "Query file path does not exist."
-        
+
         f = open(query_file)
         words = [line.strip() for line in f.readlines()]
         label = words[0]

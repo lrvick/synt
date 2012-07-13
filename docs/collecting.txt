@@ -1,7 +1,7 @@
 The 'synt collect' command allows you to build or fetch a pre-existing
 samples database. Samples are used in training the classifier and
 consist of a text and label:
-     
+
     (u'My puppy is so cute! :D', 'positive')
 
 By default collecting uses the Twitter streaming API (via Kral) to pull in
@@ -12,14 +12,14 @@ positive and negative labels.
 
 We've included two text files negwords.txt and poswords.txt that contain positive
 words and negative words, these themselves have been curated by iterating over
-the most informative features. 
+the most informative features.
 
 Collecting using a "query file" is simple. Pass the query file path
 to the collect command:
-    
+
     synt collect --query_file /home/tawlk/synt/docs/negwords.txt
 
-Currently you must run collect for each query file, that is, you cannot use 
+Currently you must run collect for each query file, that is, you cannot use
 multiple query files in one go.
 
 If you'd like to create you own query file with your own words and build a
@@ -34,4 +34,4 @@ samples database you can as well. Construct your query file (text) like so:
 The first line will be treated as the label and subsequent lines as queries.
 
 Experimenting with different queries may be beneficial as that is the basis
-for the rest of synt. 
+for the rest of synt.

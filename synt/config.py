@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 #Config for the synt project
+
 import os
 import nltk
 
 #Where collected databases and user config are stored by default
 SYNT_PATH = os.path.expanduser("~/.synt")
-USER_CONFIG_PATH = os.path.join(SYNT_PATH, 'config.py') 
+USER_CONFIG_PATH = os.path.join(SYNT_PATH, 'config.py')
 
-#Emoticons may serve as useful indicatiors in classifying sentiment. 
-#These are the set of default emoticons to use, you may use your own or 
+#Emoticons may serve as useful indicatiors in classifying sentiment.
+#These are the set of default emoticons to use, you may use your own or
 #disregard emoticons entirely they are optional.
 EMOTICONS = [
     ':-L', ':L', '<3', '8)', '8-)', '8-}', '8]', '8-]', '8-|', '8(', '8-(',

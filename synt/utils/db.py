@@ -30,7 +30,7 @@ def db_init(db, create=True):
     create (bool) -- If creating the database for the first time.
 
     """
-    
+
     if not os.path.exists(config.SYNT_PATH):
         os.makedirs(config.SYNT_PATH)
 
@@ -103,13 +103,13 @@ class RedisManager(object):
 
         #do this with multiprocessing
         batch_job(samples, redis_feature_consumer, chunksize=chunksize, processes=processes)
-        
+
 
     def store_feature_scores(self):
         """
         Build scores based on chi-sq and store from stored features then save their scores to Redis.
         """
-        
+
         pos_words = self.r.zrange('positive_feature_counts', 0, -1, withscores=True, desc=True)
         neg_words = self.r.zrange('negative_feature_counts', 0, -1, withscores=True, desc=True)
 
@@ -117,7 +117,7 @@ class RedisManager(object):
 
         feature_freqs = {}
         labeled_feature_freqs = {'positive': {}, 'negative': {}}
-        labels = labeled_feature_freqs.keys() 
+        labels = labeled_feature_freqs.keys()
 
         #build a condtional freqdist with the feature counts per label
         for feature,freq in pos_words:
@@ -125,7 +125,7 @@ class RedisManager(object):
             labeled_feature_freqs['positive'].update({feature : freq})
 
         for feature,freq in neg_words:
-            feature_freqs[feature] = freq 
+            feature_freqs[feature] = freq
             labeled_feature_freqs['negative'].update({feature : freq})
 
         scores = {}
@@ -253,4 +253,3 @@ def get_samples(db, limit, offset=0):
     pos_samples = cursor.fetchall()
 
     return pos_samples + neg_samples
-
