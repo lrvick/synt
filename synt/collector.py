@@ -7,7 +7,6 @@ from sqlite3 import IntegrityError
 from cStringIO import StringIO
 from synt.utils.db import db_init
 from synt import config
-from kral import stream
 
 def collect(db_name='', commit_every=1000, max_collect=400000, query_file=''):
     """
@@ -20,6 +19,12 @@ def collect(db_name='', commit_every=1000, max_collect=400000, query_file=''):
     max_collect (int) -- Will stop collecting at this number.
     query_file (str) -- If query file is provided should be absolute path to text file.
     """
+
+    #collect requires kral
+    try:
+        from kral import stream
+    except ImportError:
+        raise ImportError("Requires the kral package in order to collect.")
 
     if not db_name:
         d = datetime.datetime.now()

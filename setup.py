@@ -16,12 +16,10 @@ setup(
         'redis',
         'PyYAML',
         'simplejson',
-        'kral',
         'nltk',
         'numpy',
     ],
     dependency_links = [
-        'http://github.com/Tawlk/kral/tarball/master#egg=kral',
         'http://github.com/nltk/nltk/tarball/master#egg=nltk',
     ]
 )
