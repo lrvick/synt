@@ -30,8 +30,6 @@
     python3.x)
     * sqlite3 issue was fixed in 2.7 [issue](http://code.google.com/p/pysqlite/source/detail?r=9e3fa82223b89ca4e7f9eadedc1297ab5c3eebd9)
     * argparse
-  * [PyYAML](http://pyyaml.org/) (pip install pyyaml)
-    * unfortnatley nltk requires pyyaml before it can be installed [bug](http://code.google.com/p/nltk/issues/detail?id=508)
 
 
 ## Usage / Installation ##
@@ -48,24 +46,26 @@ the -h flag to get help on any particular command and see more options.**
   2. Grab the sample database to train on (or build one (below)):
 
     **Note: On your first run of any cli command a config will be copied into
-    ~/.synt/config.py that you should configure. It uses sane defaults. This
-    will only happen on the first run of synt.**
+    ~/.synt/config.py that you should configure. It uses sane defaults. The values should be
+    self-explanatory. This will only happen on the first run of synt.**
 
     ```bash
     synt fetch --db_name "mysamples.db"
     ```
 
-    By default it will be stored as 'samples.db'.
+    By default (with no db_name) it will be stored as 'samples.db'.
 
     If you'd prefer to build a fresh sample db and have the time, just run collect with
     the desired amount.
+
+    **Note: In order to collect you will require [kral](http://github.com/tawlk/kral), which is our
+    "social data gatherer" built in Python.**
 
     ```bash
     synt collect --max_collect 10000 --db_name 'awesome.db'
     ```
 
-    **Note:** You can also increment samples in a database by providing the
-    same db name.
+    **Note: You can also collect incrementally by providing the same db_name.**
 
 
   3. Train classifier
