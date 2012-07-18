@@ -4,6 +4,7 @@
 import os
 import nltk
 
+PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
 #Where collected databases and user config are stored by default
 SYNT_PATH = os.path.expanduser("~/.synt")
 USER_CONFIG_PATH = os.path.join(SYNT_PATH, 'config.py')
@@ -25,16 +26,6 @@ EMOTICONS = [
 CLASSIFIERS = {
     'naivebayes'   : nltk.NaiveBayesClassifier,
 }
-
-#The database that will house the classifer data.
-REDIS_DB = 5
-
-#The database used for tests.
-REDIS_TEST_DB = 10
-
-REDIS_HOST = 'localhost'
-
-REDIS_PASSWORD = None
 
 #If the user config is in place, use settings from there instead.
 if os.path.exists(USER_CONFIG_PATH):

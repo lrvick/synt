@@ -16,8 +16,6 @@ except ImportError:
 
 VERSION = '0.1.0'
 
-PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
-
 def main():
 
     if not os.path.exists(config.SYNT_PATH):
@@ -25,13 +23,12 @@ def main():
 
         #copy user config for first time run
         if not os.path.exists(config.USER_CONFIG_PATH):
-            user_config = os.path.join(PROJECT_PATH, 'user_config.py')
+            user_config = os.path.join(config.PROJECT_PATH, 'user_config.py')
             target_config = config.USER_CONFIG_PATH
             shutil.copy(user_config, target_config)
 
             print("First time run created a config in ~/.synt that Synt will use. Please make sure everything is ok then re-run your previous commands.")
             return
-
 
     parser = argparse.ArgumentParser(description='Tool to interface with synt, provides a way to train, collect and guess from the command line.')
     subparsers = parser.add_subparsers(dest='parser')
